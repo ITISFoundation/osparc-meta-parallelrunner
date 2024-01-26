@@ -1,0 +1,45 @@
+name: MapService
+description: "MapService"
+key: simcore/services/dynamic/osparc-map
+version: 0.0.2
+integration-version: 0.0.2
+type: dynamic
+authors:
+  - name: Werner Van Geit
+    email: 18575092+wvangeit@users.noreply.github.com
+    affiliation: IT'IS Foundation
+contact: 18575092+wvangeit@users.noreply.github.com
+inputs:
+  input_0:
+    displayOrder: 0.0
+    label: Template ID
+    description:
+     Template ID
+    type: string
+  input_1:
+    displayOrder: 1.0
+    label: Input parameters
+    description:
+      File with the parameter sets to evaluate
+    type: data:*/*
+  input_2:
+    displayOrder: 2.0
+    label: Number of workers
+    description:
+      Number of parallel workers to use to run the jobs
+    type: integer
+outputs:
+  output_1:
+    displayOrder: 1.0
+    label: Output values
+    description: Output files uploaded from the outputs folder
+    type: data:*/*
+boot-options:
+  boot_mode:
+    label: Boot mode
+    description: Select boot type for the service
+    default: "0"
+    items:
+      "0":
+        label: Default
+        description: Normal mode

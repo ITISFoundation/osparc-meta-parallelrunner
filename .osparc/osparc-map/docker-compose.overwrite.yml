@@ -1,0 +1,4 @@
+services:
+  osparc-map:
+    build:
+      dockerfile: Dockerfile
