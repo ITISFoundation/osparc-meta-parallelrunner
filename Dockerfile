@@ -9,14 +9,17 @@ ENV DEBCONF_NOWARNINGS="yes"
 
 RUN apt-get update --yes && apt-get upgrade --yes 
 RUN apt-get install -y --no-install-recommends apt-utils
-RUN apt-get install --yes --no-install-recommends python3 python-is-python3 python3-venv wget
+RUN apt-get install --yes --no-install-recommends python3 python-is-python3 python3-venv wget python3-pip
+
 
 # Copying boot scripts                                                                                                                                                                                                                                                                                                   
 COPY docker_scripts /docker
+
+RUN pip3 install /docker/*.whl
 
 USER osparcuser
 
 WORKDIR /home/osparcuser
 
-ENTRYPOINT [ "/bin/bash", "/docker/entrypoint.bash" ]
-CMD [ "/bin/sh", "-c", "docker/runner.bash "]
+ENTRYPOINT [ "/bin/bash", "-c", "/docker/entrypoint.bash" ]
+CMD [ "/bin/bash", "-c", "/docker/runner.bash "]
