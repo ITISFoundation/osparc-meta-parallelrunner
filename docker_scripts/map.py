@@ -1,6 +1,8 @@
 import json
 import os
 import time
+import pathos
+
 
 import pathlib as pl
 import logging
@@ -11,6 +13,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 POLLING_INTERVAL = 1  # second
+TEMPLATE_ID_KEY = "input_0"
+N_OF_WORKERS_KEY = "input_1"
+INPUT_PARAMETERS_KEY = "input_2"
 
 import osparc
 import osparc_client
@@ -53,26 +58,92 @@ class MapRunner:
         """Start the Python Runner"""
         logger.info("Starting map ...")
 
+        import getpass
+
+        logger.info(f"User: {getpass.getuser()}, UID: {os.getuid()}")
+        logger.info(f"Input path: {self.input_path.resolve()}")
+        logger.info(f"Input content: {list(self.input_path.rglob('*'))}")
+
         while not self.key_values_path.exists():
             logger.info("Waiting for key_values.json to exist ...")
             time.sleep(POLLING_INTERVAL)
 
-        # logger.info(json.loads(self.input_path.read_text()))
+        key_values = json.loads(self.key_values_path.read_text())
 
-        new_job = self.studies_api.create_study_job(
-            "02621c5a-bbba-11ee-ba85-02420a000022", job_inputs={"values": {}}
+        logger.info(f"Key/Values: {key_values}")
+
+        template_id = key_values[TEMPLATE_ID_KEY]["value"]
+        if template_id is None:
+            raise ValueError("Template ID can't be None")
+
+        n_of_workers = key_values[N_OF_WORKERS_KEY]["value"]
+        if n_of_workers is None:
+            raise ValueError("Number of workers can't be None")
+
+        input_parameters = key_values[INPUT_PARAMETERS_KEY]["value"]
+        if input_parameters is None:
+            raise ValueError("Input parameters can't be None")
+
+        executor = pathos.pools.ThreadPool(nodes=n_of_workers)
+
+        job_id = self.studies_api.create_study_job(
+            study_id=self.template_id, job_inputs={"values": {}}
         )
+        logger.info(job_id)
 
+        def map_func(input):
+            logger.info(f"Running worker for: {input}")
+
+            output = {}
+
+            job = self.studies_api.create_study_job(
+                study_id=self.template_id, job_inputs={"values": {}}
+            )
+
+            job_status = self.studies_api.start_study_job(
+                study_id=self.template_id, job_id=job.id
+            )
+
+            while (
+                job_status.state != "SUCCESS" and job_status.state != "FAILED"
+            ):
+                job_status = self.studies_api.inspect_study_job(
+                    study_id=template_id, job_id=job.id
+                )
+                # logger.info(f"'{job_status.state}'")
+                time.sleep(1)
+
+            output["status"] = job_status.state
+
+            if job_status.state == "FAILED":
+                output["results"] = None
+            else:
+                output["results"] = self.studies_api.get_study_job_outputs(
+                    study_id=template_id, job_id=job.id
+                ).results
+
+            self.studies_api.delete_study_job(
+                study_id=self.template_id, job_id=job.id
+            )
+
+            logger.info("Worker has finished")
+
+            return output
+
+        map_args = [parameter_set for parameter_set in input_parameters]
+
+        print(list(executor.map(map_func, map_args)))
+
+        """
         logger.info(
             self.studies_api.start_study_job(
                 study_id=self.template_id, job_id=new_job.id
             )
         )
-
-        print(new_job)
+        """
 
     def teardown(self):
-        logger.info("Completing map ...")
+        logger.info("Closing map ...")
         self.api_client.close()
 
     def read_keyvalues(self):

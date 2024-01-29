@@ -14,7 +14,7 @@ settings:
         NanoCPUs: 4000000000
         MemoryBytes: 17179869184
 paths-mapping:
-  inputs_path: /home/jovyan/work/inputs
-  outputs_path: /home/jovyan/work/outputs
+  inputs_path: /home/osparcuser/work/inputs
+  outputs_path: /home/osparcuser/work/outputs
   state_paths:
-    - /home/jovyan/work/workspace
+    - /home/osparcuser/work/workspace

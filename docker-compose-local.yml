@@ -1,16 +1,16 @@
 version: '3.7'
 services:
   osparc-map:
-    image: simcore/services/dynamic/osparc-map:0.0.2
+    image: simcore/services/dynamic/osparc-map:0.0.3
     ports:
       - "8888:8888"
     environment:
       - DY_SIDECAR_PATH_INPUTS=/tmp/inputs
       - DY_SIDECAR_PATH_OUTPUTS=/tmp/outputs
       - DY_BOOT_OPTION_BOOT_MODE=0
-      - DY_SIDECAR_PATH=/home/jovyan/work/workspace
+      - DY_SIDECAR_PATH=/home/osparcuser/work/workspace
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
-      - ${PWD}/validation/workspace:/home/jovyan/work/workspace
+      - ${PWD}/validation/workspace:/home/osparcuser/work/workspace
       - ${PWD}/validation/inputs:/tmp/inputs
       - ${PWD}/validation/outputs:/tmp/outputs
