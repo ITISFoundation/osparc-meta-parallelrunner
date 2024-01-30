@@ -18,3 +18,13 @@ paths-mapping:
   outputs_path: /home/osparcuser/work/outputs
   state_paths:
     - /home/osparcuser/work/workspace
+
+compose-spec:
+  version: "3.7"
+  services:
+    osparc-map:
+      image: $${SIMCORE_REGISTRY}/simcore/services/dynamic/osparc-map:$${SERVICE_VERSION}
+      environment:
+        - OSPARC_API_KEY=$${OSPARC_VARIABLE_API_KEY}
+        - OSPARC_API_SECRET=$${OSPARC_VARIABLE_API_SECRET}
+container-http-entrypoint: osparc-map

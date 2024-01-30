@@ -1,9 +1,9 @@
 {
     "input_0": {
         "key": "input_0",
-        "value": "92b758a0-be9f-11ee-99fa-02420a000012"
+        "value": "87e1317c-bec1-11ee-99fa-02420a000012"
     },
-    "input_1": {"key": "input_1", "value": 3},
-    "input_2": {"key": "input_2", "value": [[1,2], [3,4], [5,6],[5,6],[5,6],[5,6]]}
+    "input_1": {"key": "input_1", "value": 2},
+    "input_2": {"key": "input_2", "value": "/tmp/inputs/input_2/"}
     
 }

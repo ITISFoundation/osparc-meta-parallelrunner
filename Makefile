@@ -4,7 +4,7 @@ SHELL = /bin/sh
 .DEFAULT_GOAL := help
 
 export DOCKER_IMAGE_NAME ?= osparc-map
-export DOCKER_IMAGE_TAG ?= 0.0.3
+export DOCKER_IMAGE_TAG ?= 0.0.4
 
 define _bumpversion
 	# upgrades as $(subst $(1),,$@) version, commits and tags

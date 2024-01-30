@@ -1,8 +1,8 @@
 name: MapService
 description: "MapService"
 key: simcore/services/dynamic/osparc-map
-version: 0.0.3
-integration-version: 0.0.3
+version: 0.0.4
+integration-version: 0.0.4
 type: dynamic
 authors:
   - name: Werner Van Geit
@@ -18,16 +18,16 @@ inputs:
     type: string
   input_1:
     displayOrder: 1.0
-    label: Input parameters
-    description:
-      File with the parameter sets to evaluate
-    type: data:*/*
-  input_2:
-    displayOrder: 2.0
     label: Number of workers
     description:
       Number of parallel workers to use to run the jobs
     type: integer
+  input_2:
+    displayOrder: 2.0
+    label: Input parameters
+    description:
+      File with the parameter sets to evaluate
+    type: data:*/*
 outputs:
   output_1:
     displayOrder: 1.0
