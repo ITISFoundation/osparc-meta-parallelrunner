@@ -28,8 +28,9 @@ def main():
     """Main"""
 
     input_path = pl.Path(os.environ["DY_SIDECAR_PATH_INPUTS"])
+    output_path = pl.Path(os.environ["DY_SIDECAR_PATH_OUTPUTS"])
 
-    pyrunner = MapRunner(input_path)
+    pyrunner = MapRunner(input_path, output_path)
 
     try:
         pyrunner.setup()
@@ -40,10 +41,11 @@ def main():
 
 
 class MapRunner:
-    def __init__(self, input_path, polling_time=1):
+    def __init__(self, input_path, output_path, polling_time=1):
         """Constructor"""
 
         self.input_path = input_path  # path where osparc write all our input
+        self.output_path = output_path  # path where osparc write all our input
         self.key_values_path = self.input_path / "key_values.json"
 
     def setup(self):
@@ -81,19 +83,22 @@ class MapRunner:
         if n_of_workers is None:
             raise ValueError("Number of workers can't be None")
 
-        input_parameters_dir_path = self.input_path / INPUT_PARAMETERS_KEY
+        output_tasks_path = self.output_path / "output_1" / "output_tasks.json"
 
-        json_list = list(input_parameters_dir_path.glob("*.json"))
+        input_tasks_dir_path = self.input_path / INPUT_PARAMETERS_KEY
+        json_list = list(input_tasks_dir_path.glob("*.json"))
         if len(json_list) != 1:
             raise ValueError(
                 f"More than 1 or no json file found in the input parameters path: {json_list}"
             )
 
-        input_parameters_path = json_list[0]
+        input_tasks_path = json_list[0]
+        input_dict = json.loads(input_tasks_path.read_text())
 
-        tasks = json.loads(input_parameters_path.read_text())["tasks"]
+        tasks_uuid = input_dict["uuid"]
+        input_tasks = input_dict["tasks"]
 
-        logger.info(f"Evaluating: {tasks}")
+        logger.info(f"Evaluating: {input_tasks}")
 
         logger.info(f"Starting {n_of_workers} workers")
         executor = pathos.pools.ThreadPool(nodes=n_of_workers)
@@ -190,7 +195,14 @@ class MapRunner:
 
             return task
 
-        print(list(executor.map(map_func, tasks)))
+        logger.info(f"Starting tasks on {n_of_workers} workers")
+        output_tasks = list(executor.map(map_func, input_tasks))
+
+        output_tasks_content = json.dumps(
+            {"uuid": tasks_uuid, "tasks": output_tasks}
+        )
+        logger.info(f"Finished all tasks: {output_tasks_content}")
+        output_tasks_path.write_text(output_tasks_content)
 
     def teardown(self):
         logger.info("Closing map ...")
