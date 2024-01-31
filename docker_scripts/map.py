@@ -91,30 +91,45 @@ class MapRunner:
 
         input_parameters_path = json_list[0]
 
-        input_parameters = json.loads(input_parameters_path.read_text())
+        tasks = json.loads(input_parameters_path.read_text())["tasks"]
 
-        logger.info(f"Evaluating: {input_parameters}")
+        logger.info(f"Evaluating: {tasks}")
 
         logger.info(f"Starting {n_of_workers} workers")
         executor = pathos.pools.ThreadPool(nodes=n_of_workers)
 
-        def map_func(input):
-            logger.info(f"Running worker for input: {input}")
+        def map_func(task):
+            logger.info(f"Running worker for task: {task}")
 
-            output = {"input": input}
+            input = task["input"]
+            output = task["output"]
 
-            tmp_dir = tempfile.TemporaryDirectory()
-            tmp_dir_path = pl.Path(tmp_dir.name)
-            tmp_input_file_path = tmp_dir_path / "input.json"
-            tmp_input_file_path.write_text(json.dumps(input))
+            job_inputs = {"values": {}}
 
-            input_data_file = osparc.FilesApi(self.api_client).upload_file(
-                file=tmp_input_file_path
-            )
+            for param_name, param_input in input.items():
+                param_type = param_input["type"]
+                param_value = param_input["value"]
+                if param_type == "FileJSON":
+                    param_filename = param_input["filename"]
+                    tmp_dir = tempfile.TemporaryDirectory()
+                    tmp_dir_path = pl.Path(tmp_dir.name)
+                    tmp_input_file_path = tmp_dir_path / param_filename
+                    tmp_input_file_path.write_text(json.dumps(param_value))
+
+                    input_data_file = osparc.FilesApi(
+                        self.api_client
+                    ).upload_file(file=tmp_input_file_path)
+                    job_inputs["values"][param_name] = input_data_file
+                elif param_type == "integer":
+                    job_inputs["values"][param_name] = int(param_value)
+                elif param_type == "float":
+                    job_inputs["values"][param_name] = float(param_value)
+                else:
+                    job_inputs["values"][param_name] = param_value
 
             job = self.studies_api.create_study_job(
                 study_id=self.template_id,
-                job_inputs={"values": {"InputFile1": input_data_file}},
+                job_inputs=job_inputs,
             )
 
             job_status = self.studies_api.start_study_job(
@@ -129,20 +144,23 @@ class MapRunner:
                 )
                 time.sleep(1)
 
-            output["status"] = job_status.state
+            task["status"] = job_status.state
 
             if job_status.state == "FAILED":
-                output["results"] = None
+                logger.error(f"Task failed: {task}")
             else:
                 results = self.studies_api.get_study_job_outputs(
                     study_id=self.template_id, job_id=job.id
                 ).results
 
-                output["results"] = {}
                 for probe_name, probe_output in results.items():
-                    if isinstance(
-                        probe_output, osparc_client.models.file.File
-                    ):
+                    if probe_name not in output:
+                        raise ValueError(
+                            f"Unknown probe in output: {probe_name}"
+                        )
+                    probe_type = output[probe_name]["type"]
+
+                    if probe_type == "FileJSON":
                         output_file = pl.Path(
                             osparc.FilesApi(self.api_client).download_file(
                                 probe_output.id
@@ -150,27 +168,29 @@ class MapRunner:
                         )
                         with zipfile.ZipFile(output_file, "r") as zip_file:
                             file_results_path = zipfile.Path(
-                                zip_file, at="output.json"
+                                zip_file, at=output[probe_name]["filename"]
                             )
                             file_results = json.loads(
                                 file_results_path.read_text()
                             )
 
-                        output["results"][probe_name] = file_results
+                        output[probe_name]["value"] = file_results
+                    elif probe_type == "integer":
+                        output[probe_name]["value"] = int(probe_output)
+                    elif probe_type == "float":
+                        output[probe_name]["value"] = float(probe_output)
                     else:
-                        output["results"][probe_name] = probe_output
+                        output[probe_name]["value"] = probe_output
+
+                logger.info(f"Worker has finished task: {task}")
 
             self.studies_api.delete_study_job(
                 study_id=self.template_id, job_id=job.id
             )
 
-            logger.info(f"Worker has finished with output: {output}")
+            return task
 
-            return output
-
-        map_args = [parameter_set for parameter_set in input_parameters]
-
-        print(list(executor.map(map_func, map_args)))
+        print(list(executor.map(map_func, tasks)))
 
     def teardown(self):
         logger.info("Closing map ...")
