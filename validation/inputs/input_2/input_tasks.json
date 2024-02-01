@@ -1,5 +1,6 @@
 {
     "uuid": "23423432",
+    "command": "run",
     "tasks": [
         {
             "input": {
@@ -22,7 +23,7 @@
                 }
             },
             "output": {
-                "OutputProbe1": {
+                "OutputFile1": {
                      "type": "FileJSON",
                      "filename": "output.json"
                 },
@@ -55,7 +56,7 @@
                 }
             },
             "output": {
-                "OutputProbe1": {
+                "OutputFile1": {
                      "type": "FileJSON",
                      "filename": "output.json"
                 },
@@ -80,7 +81,7 @@
                 }
             },
             "output": {
-                "OutputProbe1": {
+                "OutputFile1": {
                      "type": "FileJSON",
                      "filename": "output.json"
                 },

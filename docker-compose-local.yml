@@ -13,6 +13,6 @@ services:
       - OSPARC_API_SECRET=0dsHA6zdYDNEtwNKsXZHBQq8eHuPbd
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
-      - ${PWD}/validation/workspace:/home/osparcuser/work/workspace
-      - ${PWD}/validation/inputs:/tmp/inputs
-      - ${PWD}/validation/outputs:/tmp/outputs
+      - ${PWD}/validation-tmp/workspace:/home/osparcuser/work/workspace
+      - ${PWD}/validation-tmp/inputs:/tmp/inputs
+      - ${PWD}/validation-tmp/outputs:/tmp/outputs

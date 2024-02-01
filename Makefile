@@ -36,6 +36,8 @@ build: clean compose-spec	## build docker image
 
 .PHONY: run-local
 run-local:	## runs image with local configuration
+	sudo rm -rf validation-tmp
+	cp -r validation validation-tmp
 	docker-compose --file docker-compose-local.yml up
 
 .PHONY: publish-local

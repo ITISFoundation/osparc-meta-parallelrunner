@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import uuid
 
 import tempfile
 import zipfile
@@ -30,7 +31,9 @@ def main():
     input_path = pl.Path(os.environ["DY_SIDECAR_PATH_INPUTS"])
     output_path = pl.Path(os.environ["DY_SIDECAR_PATH_OUTPUTS"])
 
-    pyrunner = MapRunner(input_path, output_path)
+    pyrunner = MapRunner(
+        input_path, output_path, polling_interval=POLLING_INTERVAL
+    )
 
     try:
         pyrunner.setup()
@@ -41,12 +44,30 @@ def main():
 
 
 class MapRunner:
-    def __init__(self, input_path, output_path, polling_time=1):
+    def __init__(self, input_path, output_path, polling_interval=1):
         """Constructor"""
 
         self.input_path = input_path  # path where osparc write all our input
         self.output_path = output_path  # path where osparc write all our input
         self.key_values_path = self.input_path / "key_values.json"
+
+        self.handshake_input_path = (
+            self.input_path / "input_2" / "handshake.json"
+        )
+        self.handshake_output_path = (
+            self.output_path / "output_1" / "handshake.json"
+        )
+
+        self.input_tasks_path = (
+            self.input_path / "input_2" / "input_tasks.json"
+        )
+        self.output_tasks_path = (
+            self.output_path / "output_1" / "output_tasks.json"
+        )
+
+        self.polling_interval = polling_interval
+        self.caller_uuid = None
+        self.uuid = str(uuid.uuid4())
 
     def setup(self):
         """Setup the Python Runner"""
@@ -58,6 +79,55 @@ class MapRunner:
         self.api_client = osparc.ApiClient(self.osparc_cfg)
         self.studies_api = osparc_client.StudiesApi(self.api_client)
 
+    def perform_handshake(self):
+        """Perform handshake with caller"""
+
+        def try_handshake():
+            handshake_out = {
+                "type": "map",
+                "command": "register",
+                "uuid": self.uuid,
+            }
+            self.handshake_output_path.write_text(json.dumps(handshake_out))
+
+            waiter_confirm = 0
+            while not self.handshake_input_path.exists():
+                if waiter_confirm % 10 == 0:
+                    logger.info(
+                        f"Waiting for handshake registration confirmation file at {self.handshake_input_path}"
+                    )
+                time.sleep(self.polling_interval)
+                waiter_confirm += 1
+
+            return json.loads(self.handshake_input_path.read_text())
+
+        waiter = 0
+        while True:
+            handshake_in = try_handshake()
+            if (
+                handshake_in["command"] != "confirm_registration"
+                or "confirmed_uuid" != self.uuid
+            ):
+                break
+            time.sleep(self.polling_interval)
+            if waiter % 10 == 0:
+                logger.info(
+                    "Waiting for correct handshake registration confirmation ..."
+                )
+            waiter += 1
+
+        caller_uuid = handshake_in["uuid"]
+
+        handshake_out = {
+            "type": "map",
+            "command": "confirm_registration",
+            "uuid": self.uuid,
+            "confirmed_uuid": self.caller_uuid,
+        }
+        self.handshake_output_path.write_text(json.dumps(handshake_out))
+
+        return caller_uuid
+
     def start(self):
         """Start the Python Runner"""
         logger.info("Starting map ...")
@@ -67,11 +137,30 @@ class MapRunner:
         logger.info(f"User: {getpass.getuser()}, UID: {os.getuid()}")
         logger.info(f"Input path: {self.input_path.resolve()}")
 
+        waiter = 0
         while not self.key_values_path.exists():
-            logger.info("Waiting for key_values.json to exist ...")
-            time.sleep(POLLING_INTERVAL)
+            if waiter % 10 == 0:
+                logger.info("Waiting for key_values.json to exist ...")
+            time.sleep(self.polling_interval)
+            waiter += 1
 
         key_values = json.loads(self.key_values_path.read_text())
+
+        self.caller_uuid = self.perform_handshake()
+        logger.info(f"Performed handshake with caller: {self.caller_uuid}")
+
+        waiter = 0
+        while (
+            INPUT_PARAMETERS_KEY not in key_values
+            or key_values[INPUT_PARAMETERS_KEY]["value"] is None
+        ):
+            if waiter % 10 == 0:
+                logger.info(
+                    f"Waiting for {INPUT_PARAMETERS_KEY} to exist in key_values..."
+                )
+            key_values = json.loads(self.key_values_path.read_text())
+            time.sleep(self.polling_interval)
+            waiter += 1
 
         logger.info(f"Key/Values: {key_values}")
 
@@ -83,21 +172,56 @@ class MapRunner:
         if n_of_workers is None:
             raise ValueError("Number of workers can't be None")
 
-        output_tasks_path = self.output_path / "output_1" / "output_tasks.json"
-
-        input_tasks_dir_path = self.input_path / INPUT_PARAMETERS_KEY
-        json_list = list(input_tasks_dir_path.glob("*.json"))
-        if len(json_list) != 1:
+        if not self.input_tasks_path.exists():
             raise ValueError(
-                f"More than 1 or no json file found in the input parameters path: {json_list}"
+                f"No input tasks file at: {self.input_tasks_path}"
             )
 
-        input_tasks_path = json_list[0]
-        input_dict = json.loads(input_tasks_path.read_text())
+        last_tasks_uuid = ""
+        waiter = 0
+        while True:
+            input_dict = json.loads(self.input_tasks_path.read_text())
+            command = input_dict["command"]
+            caller_uuid = input_dict["caller_uuid"]
+            if caller_uuid != self.caller_uuid:
+                logger.info(
+                    "Received command from wrong caller uuid: {caller_uuid}"
+                )
 
-        tasks_uuid = input_dict["uuid"]
-        input_tasks = input_dict["tasks"]
+            if command == "stop":
+                logger.info("Received command to stop map")
+                break
+            elif command == "run":
+                tasks_uuid = input_dict["uuid"]
 
+                if (
+                    tasks_uuid == last_tasks_uuid
+                    and caller_uuid != self.caller_uuid
+                ):
+                    if waiter % 10 == 0:
+                        logger.info("Waiting for new tasks uuid")
+                    time.sleep(self.polling_interval)
+                    waiter += 1
+                else:
+                    input_tasks = input_dict["tasks"]
+                    output_tasks = self.run_tasks(
+                        tasks_uuid, input_tasks, n_of_workers
+                    )
+                    output_tasks_content = json.dumps(
+                        {"uuid": tasks_uuid, "tasks": output_tasks}
+                    )
+                    self.output_tasks_path.write_text(output_tasks_content)
+                    logger.info(
+                        f"Finished a set of tasks: {output_tasks_content}"
+                    )
+                    last_tasks_uuid = tasks_uuid
+                    waiter = 0
+            else:
+                raise ValueError("Command unknown: {command}")
+
+            time.sleep(self.polling_interval)
+
+    def run_tasks(self, tasks_uuid, input_tasks, n_of_workers):
         logger.info(f"Evaluating: {input_tasks}")
 
         logger.info(f"Starting {n_of_workers} workers")
@@ -197,12 +321,9 @@ class MapRunner:
 
         logger.info(f"Starting tasks on {n_of_workers} workers")
         output_tasks = list(executor.map(map_func, input_tasks))
+        executor.close()
 
-        output_tasks_content = json.dumps(
-            {"uuid": tasks_uuid, "tasks": output_tasks}
-        )
-        logger.info(f"Finished all tasks: {output_tasks_content}")
-        output_tasks_path.write_text(output_tasks_content)
+        return output_tasks
 
     def teardown(self):
         logger.info("Closing map ...")
@@ -212,6 +333,7 @@ class MapRunner:
         """Read keyvalues file"""
 
         keyvalues_unprocessed = json.loads(self.keyvalues_path.read_text())
+        self.keyvalues_path.unlink()
 
         keyvalues = {}
         for key, value in keyvalues_unprocessed.items():
