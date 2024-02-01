@@ -58,12 +58,17 @@ class MapRunner:
             self.output_path / "output_1" / "handshake.json"
         )
 
+        if self.handshake_output_path.exists():
+            self.handshake_output_path.unlink()
+
         self.input_tasks_path = (
             self.input_path / "input_2" / "input_tasks.json"
         )
         self.output_tasks_path = (
             self.output_path / "output_1" / "output_tasks.json"
         )
+        if self.output_tasks_path.exists():
+            self.output_tasks_path.unlink()
 
         self.polling_interval = polling_interval
         self.caller_uuid = None
@@ -89,6 +94,9 @@ class MapRunner:
                 "uuid": self.uuid,
             }
             self.handshake_output_path.write_text(json.dumps(handshake_out))
+            logger.info(
+                f"Wrote handshake file to {self.handshake_output_path}"
+            )
 
             waiter_confirm = 0
             while not self.handshake_input_path.exists():
@@ -105,16 +113,17 @@ class MapRunner:
         while True:
             handshake_in = try_handshake()
             if (
-                handshake_in["command"] != "confirm_registration"
-                or "confirmed_uuid" != self.uuid
+                handshake_in["command"] == "confirm_registration"
+                and "confirmed_uuid" == self.uuid
             ):
                 break
-            time.sleep(self.polling_interval)
-            if waiter % 10 == 0:
-                logger.info(
-                    "Waiting for correct handshake registration confirmation ..."
-                )
-            waiter += 1
+            else:
+                time.sleep(self.polling_interval)
+                if waiter % 10 == 0:
+                    logger.info(
+                        "Waiting for correct handshake registration confirmation ..."
+                    )
+                waiter += 1
 
         caller_uuid = handshake_in["uuid"]
 
