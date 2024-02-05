@@ -87,17 +87,15 @@ class MapRunner:
     def perform_handshake(self):
         """Perform handshake with caller"""
 
-        def try_handshake():
-            handshake_out = {
-                "type": "map",
-                "command": "register",
-                "uuid": self.uuid,
-            }
-            self.handshake_output_path.write_text(json.dumps(handshake_out))
-            logger.info(
-                f"Wrote handshake file to {self.handshake_output_path}"
-            )
+        handshake_out = {
+            "type": "map",
+            "command": "register",
+            "uuid": self.uuid,
+        }
+        self.handshake_output_path.write_text(json.dumps(handshake_out))
+        logger.info(f"Wrote handshake file to {self.handshake_output_path}")
 
+        def try_handshake():
             waiter_confirm = 0
             while not self.handshake_input_path.exists():
                 if waiter_confirm % 10 == 0:
@@ -114,16 +112,16 @@ class MapRunner:
             handshake_in = try_handshake()
             if (
                 handshake_in["command"] == "confirm_registration"
-                and "confirmed_uuid" == self.uuid
+                and handshake_in["confirmed_uuid"] == self.uuid
             ):
                 break
             else:
-                time.sleep(self.polling_interval)
                 if waiter % 10 == 0:
                     logger.info(
                         "Waiting for correct handshake registration confirmation ..."
                     )
                 waiter += 1
+            time.sleep(self.polling_interval)
 
         caller_uuid = handshake_in["uuid"]
 
@@ -131,7 +129,7 @@ class MapRunner:
             "type": "map",
             "command": "confirm_registration",
             "uuid": self.uuid,
-            "confirmed_uuid": self.caller_uuid,
+            "confirmed_uuid": caller_uuid,
         }
         self.handshake_output_path.write_text(json.dumps(handshake_out))
 
@@ -171,8 +169,6 @@ class MapRunner:
             time.sleep(self.polling_interval)
             waiter += 1
 
-        logger.info(f"Key/Values: {key_values}")
-
         self.template_id = key_values[TEMPLATE_ID_KEY]["value"]
         if self.template_id is None:
             raise ValueError("Template ID can't be None")
@@ -181,10 +177,14 @@ class MapRunner:
         if n_of_workers is None:
             raise ValueError("Number of workers can't be None")
 
-        if not self.input_tasks_path.exists():
-            raise ValueError(
-                f"No input tasks file at: {self.input_tasks_path}"
-            )
+        waiter = 0
+        while not self.input_tasks_path.exists():
+            if waiter % 10 == 0:
+                logger.info(
+                    f"Waiting for input file at {self.input_tasks_path}..."
+                )
+            time.sleep(self.polling_interval)
+            waiter += 1
 
         last_tasks_uuid = ""
         waiter = 0
@@ -192,21 +192,22 @@ class MapRunner:
             input_dict = json.loads(self.input_tasks_path.read_text())
             command = input_dict["command"]
             caller_uuid = input_dict["caller_uuid"]
-            if caller_uuid != self.caller_uuid:
-                logger.info(
-                    "Received command from wrong caller uuid: {caller_uuid}"
-                )
+            map_uuid = input_dict["map_uuid"]
+            if caller_uuid != self.caller_uuid or map_uuid != self.uuid:
+                if waiter % 10 == 0:
+                    logger.info(
+                        f"Received command with wrong caller uuid: {caller_uuid} or map uuid: {map_uuid}"
+                    )
+                time.sleep(self.polling_interval)
+                waiter += 1
+                continue
 
             if command == "stop":
-                logger.info("Received command to stop map")
                 break
             elif command == "run":
                 tasks_uuid = input_dict["uuid"]
 
-                if (
-                    tasks_uuid == last_tasks_uuid
-                    and caller_uuid != self.caller_uuid
-                ):
+                if tasks_uuid == last_tasks_uuid:
                     if waiter % 10 == 0:
                         logger.info("Waiting for new tasks uuid")
                     time.sleep(self.polling_interval)
@@ -232,9 +233,6 @@ class MapRunner:
 
     def run_tasks(self, tasks_uuid, input_tasks, n_of_workers):
         logger.info(f"Evaluating: {input_tasks}")
-
-        logger.info(f"Starting {n_of_workers} workers")
-        executor = pathos.pools.ThreadPool(nodes=n_of_workers)
 
         def map_func(task):
             logger.info(f"Running worker for task: {task}")
@@ -329,8 +327,11 @@ class MapRunner:
             return task
 
         logger.info(f"Starting tasks on {n_of_workers} workers")
-        output_tasks = list(executor.map(map_func, input_tasks))
-        executor.close()
+        with pathos.pools.ThreadPool(nodes=n_of_workers) as pool:
+            output_tasks = list(pool.map(map_func, input_tasks))
+            pool.close()
+            pool.join()
+            pool.clear()  # Pool is singleton, need to clear old pool
 
         return output_tasks
 
