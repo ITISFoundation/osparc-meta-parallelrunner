@@ -15,7 +15,8 @@ RUN apt-get install --yes --no-install-recommends python3 python-is-python3 pyth
 # Copying boot scripts                                                                                                                                                                                                                                                                                                   
 COPY docker_scripts /docker
 
-RUN pip3 install pathos /docker/*.whl
+RUN pip3 install pathos --upgrade
+RUN pip3 install /docker/*.whl
 
 USER osparcuser
 

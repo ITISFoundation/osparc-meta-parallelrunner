@@ -10,7 +10,7 @@ import pathlib as pl
 import logging
 
 logging.basicConfig(
-    level=logging.INFO, format="[%(filename)s:%(lineno)d] %(message)s"
+    level=logging.DEBUG, format="[%(filename)s:%(lineno)d] %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,7 @@ INPUT_PARAMETERS_KEY = "input_2"
 
 import osparc
 import osparc_client
+from osparc_filecomms import handshakers
 
 
 def main():
@@ -51,28 +52,28 @@ class MapRunner:
         self.output_path = output_path  # path where osparc write all our input
         self.key_values_path = self.input_path / "key_values.json"
 
-        self.handshake_input_path = (
-            self.input_path / "input_2" / "handshake.json"
-        )
-        self.handshake_output_path = (
-            self.output_path / "output_1" / "handshake.json"
-        )
+        self.input_tasks_dir_path = self.input_path / "input_2"
+        self.input_tasks_path = self.input_tasks_dir_path / "input_tasks.json"
 
-        if self.handshake_output_path.exists():
-            self.handshake_output_path.unlink()
-
-        self.input_tasks_path = (
-            self.input_path / "input_2" / "input_tasks.json"
-        )
+        self.output_tasks_dir_path = self.output_path / "output_1"
         self.output_tasks_path = (
-            self.output_path / "output_1" / "output_tasks.json"
+            self.output_tasks_dir_path / "output_tasks.json"
         )
+
         if self.output_tasks_path.exists():
             self.output_tasks_path.unlink()
 
         self.polling_interval = polling_interval
         self.caller_uuid = None
         self.uuid = str(uuid.uuid4())
+
+        self.handshaker = handshakers.FileHandshaker(
+            self.uuid,
+            self.input_tasks_dir_path,
+            self.output_tasks_dir_path,
+            is_initiator=True,
+            verbose_level=logging.DEBUG,
+        )
 
     def setup(self):
         """Setup the Python Runner"""
@@ -83,57 +84,6 @@ class MapRunner:
         )
         self.api_client = osparc.ApiClient(self.osparc_cfg)
         self.studies_api = osparc_client.StudiesApi(self.api_client)
-
-    def perform_handshake(self):
-        """Perform handshake with caller"""
-
-        handshake_out = {
-            "type": "map",
-            "command": "register",
-            "uuid": self.uuid,
-        }
-        self.handshake_output_path.write_text(json.dumps(handshake_out))
-        logger.info(f"Wrote handshake file to {self.handshake_output_path}")
-
-        def try_handshake():
-            waiter_confirm = 0
-            while not self.handshake_input_path.exists():
-                if waiter_confirm % 10 == 0:
-                    logger.info(
-                        f"Waiting for handshake registration confirmation file at {self.handshake_input_path}"
-                    )
-                time.sleep(self.polling_interval)
-                waiter_confirm += 1
-
-            return json.loads(self.handshake_input_path.read_text())
-
-        waiter = 0
-        while True:
-            handshake_in = try_handshake()
-            if (
-                handshake_in["command"] == "confirm_registration"
-                and handshake_in["confirmed_uuid"] == self.uuid
-            ):
-                break
-            else:
-                if waiter % 10 == 0:
-                    logger.info(
-                        "Waiting for correct handshake registration confirmation ..."
-                    )
-                waiter += 1
-            time.sleep(self.polling_interval)
-
-        caller_uuid = handshake_in["uuid"]
-
-        handshake_out = {
-            "type": "map",
-            "command": "confirm_registration",
-            "uuid": self.uuid,
-            "confirmed_uuid": caller_uuid,
-        }
-        self.handshake_output_path.write_text(json.dumps(handshake_out))
-
-        return caller_uuid
 
     def start(self):
         """Start the Python Runner"""
@@ -153,7 +103,7 @@ class MapRunner:
 
         key_values = json.loads(self.key_values_path.read_text())
 
-        self.caller_uuid = self.perform_handshake()
+        self.caller_uuid = self.handshaker.shake()
         logger.info(f"Performed handshake with caller: {self.caller_uuid}")
 
         waiter = 0
