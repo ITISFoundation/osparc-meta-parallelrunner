@@ -226,7 +226,7 @@ class MapRunner:
                 else:
                     job_inputs["values"][param_name] = param_value
 
-            logger.info(f"Sending inputs: {job_inputs}")
+            logger.debug(f"Sending inputs: {job_inputs}")
 
             job = self.studies_api.create_study_job(
                 study_id=self.template_id,
