@@ -279,7 +279,7 @@ class MapRunner:
                     elif probe_type == "file":
                         tmp_output_data_file = osparc.FilesApi(
                             self.api_client
-                        ).download_file(probe_output)
+                        ).download_file(probe_output.id)
                         output_data_file = osparc.FilesApi(
                             self.api_client
                         ).upload_file(tmp_output_data_file)
