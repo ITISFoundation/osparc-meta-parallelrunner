@@ -209,7 +209,7 @@ class MapRunner:
                         self.api_client
                     ).upload_file(file=tmp_input_file_path)
                     job_inputs["values"][param_name] = input_data_file
-                elif param_type == "File":
+                elif param_type == "file":
                     file_info = json.loads(param_value)
                     input_data_file = osparc_client.models.file.File(
                         id=file_info["id"],
@@ -276,6 +276,10 @@ class MapRunner:
                             )
 
                         output[probe_name]["value"] = file_results
+                    elif probe_type == "file":
+                        output[probe_name]["value"] = json.dumps(
+                            probe_output.to_dict()
+                        )
                     elif probe_type == "integer":
                         output[probe_name]["value"] = int(probe_output)
                     elif probe_type == "float":
