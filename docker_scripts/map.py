@@ -23,6 +23,7 @@ INPUT_PARAMETERS_KEY = "input_2"
 
 import osparc
 import osparc_client
+import osparc_client.models.file
 from osparc_filecomms import handshakers
 
 
@@ -73,6 +74,8 @@ class MapRunner:
             self.output_tasks_dir_path,
             is_initiator=True,
             verbose_level=logging.DEBUG,
+            polling_interval=0.1,
+            print_polling_interval=100,
         )
 
     def setup(self):
@@ -206,12 +209,24 @@ class MapRunner:
                         self.api_client
                     ).upload_file(file=tmp_input_file_path)
                     job_inputs["values"][param_name] = input_data_file
+                elif param_type == "File":
+                    file_info = json.loads(param_value)
+                    input_data_file = osparc_client.models.file.File(
+                        id=file_info["id"],
+                        filename=file_info["filename"],
+                        content_type=file_info["content_type"],
+                        checksum=file_info["checksum"],
+                        e_tag=file_info["e_tag"],
+                    )
+                    job_inputs["values"][param_name] = input_data_file
                 elif param_type == "integer":
                     job_inputs["values"][param_name] = int(param_value)
                 elif param_type == "float":
                     job_inputs["values"][param_name] = float(param_value)
                 else:
                     job_inputs["values"][param_name] = param_value
+
+            logger.info(f"Sending inputs: {job_inputs}")
 
             job = self.studies_api.create_study_job(
                 study_id=self.template_id,
