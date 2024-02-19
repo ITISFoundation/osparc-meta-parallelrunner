@@ -277,8 +277,15 @@ class MapRunner:
 
                         output[probe_name]["value"] = file_results
                     elif probe_type == "file":
+                        tmp_output_data_file = osparc.FilesApi(
+                            self.api_client
+                        ).download_file(probe_output)
+                        output_data_file = osparc.FilesApi(
+                            self.api_client
+                        ).upload_file(tmp_output_data_file)
+
                         output[probe_name]["value"] = json.dumps(
-                            probe_output.to_dict()
+                            output_data_file.to_dict()
                         )
                     elif probe_type == "integer":
                         output[probe_name]["value"] = int(probe_output)
