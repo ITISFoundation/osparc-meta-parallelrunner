@@ -10,7 +10,7 @@ import pathlib as pl
 import logging
 
 logging.basicConfig(
-    level=logging.DEBUG, format="[%(filename)s:%(lineno)d] %(message)s"
+    level=logging.INFO, format="[%(filename)s:%(lineno)d] %(message)s"
 )
 logger = logging.getLogger(__name__)
 
