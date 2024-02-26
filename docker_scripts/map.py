@@ -1,8 +1,13 @@
+from osparc_filecomms import handshakers
+import osparc_client.models.file
+import osparc_client
+import osparc
+import pathos
 import json
 import os
 import time
 import uuid
-
+import contextlib
 import tempfile
 import zipfile
 
@@ -14,17 +19,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-import pathos
 
 POLLING_INTERVAL = 1  # second
 TEMPLATE_ID_KEY = "input_0"
 N_OF_WORKERS_KEY = "input_1"
 INPUT_PARAMETERS_KEY = "input_2"
-
-import osparc
-import osparc_client
-import osparc_client.models.file
-from osparc_filecomms import handshakers
 
 
 def main():
@@ -43,6 +42,18 @@ def main():
         pyrunner.teardown()
     except Exception as err:  # pylint: disable=broad-except
         logger.error(f"{err} . Stopping %s", exc_info=True)
+
+
+@contextlib.contextmanager
+def create_study_job(template_id, job_inputs, studies_api):
+    job = studies_api.create_study_job(
+        study_id=template_id,
+        job_inputs=job_inputs,
+    )
+    try:
+        yield job
+    finally:
+        studies_api.delete_study_job(template_id, job.id)
 
 
 class MapRunner:
@@ -116,7 +127,8 @@ class MapRunner:
         ):
             if waiter % 10 == 0:
                 logger.info(
-                    f"Waiting for {INPUT_PARAMETERS_KEY} to exist in key_values..."
+                    f"Waiting for {INPUT_PARAMETERS_KEY} "
+                    "to exist in key_values..."
                 )
             key_values = json.loads(self.key_values_path.read_text())
             time.sleep(self.polling_interval)
@@ -149,7 +161,8 @@ class MapRunner:
             if caller_uuid != self.caller_uuid or map_uuid != self.uuid:
                 if waiter % 10 == 0:
                     logger.info(
-                        f"Received command with wrong caller uuid: {caller_uuid} or map uuid: {map_uuid}"
+                        "Received command with wrong caller uuid: "
+                        f"{caller_uuid} or map uuid: {map_uuid}"
                     )
                 time.sleep(self.polling_interval)
                 waiter += 1
@@ -228,77 +241,72 @@ class MapRunner:
 
             logger.debug(f"Sending inputs: {job_inputs}")
 
-            job = self.studies_api.create_study_job(
-                study_id=self.template_id,
-                job_inputs=job_inputs,
-            )
-
-            job_status = self.studies_api.start_study_job(
-                study_id=self.template_id, job_id=job.id
-            )
-
-            while (
-                job_status.state != "SUCCESS" and job_status.state != "FAILED"
-            ):
-                job_status = self.studies_api.inspect_study_job(
+            with create_study_job(
+                self.template_id, job_inputs, self.study_api
+            ) as job:
+                job_status = self.studies_api.start_study_job(
                     study_id=self.template_id, job_id=job.id
                 )
-                time.sleep(1)
 
-            task["status"] = job_status.state
+                while (
+                    job_status.state != "SUCCESS"
+                    and job_status.state != "FAILED"
+                ):
+                    job_status = self.studies_api.inspect_study_job(
+                        study_id=self.template_id, job_id=job.id
+                    )
+                    time.sleep(1)
 
-            if job_status.state == "FAILED":
-                logger.error(f"Task failed: {task}")
-            else:
-                results = self.studies_api.get_study_job_outputs(
-                    study_id=self.template_id, job_id=job.id
-                ).results
+                task["status"] = job_status.state
 
-                for probe_name, probe_output in results.items():
-                    if probe_name not in output:
-                        raise ValueError(
-                            f"Unknown probe in output: {probe_name}"
-                        )
-                    probe_type = output[probe_name]["type"]
+                if job_status.state == "FAILED":
+                    logger.error(f"Task failed: {task}")
+                else:
+                    results = self.studies_api.get_study_job_outputs(
+                        study_id=self.template_id, job_id=job.id
+                    ).results
 
-                    if probe_type == "FileJSON":
-                        output_file = pl.Path(
-                            osparc.FilesApi(self.api_client).download_file(
-                                probe_output.id
+                    for probe_name, probe_output in results.items():
+                        if probe_name not in output:
+                            raise ValueError(
+                                f"Unknown probe in output: {probe_name}"
                             )
-                        )
-                        with zipfile.ZipFile(output_file, "r") as zip_file:
-                            file_results_path = zipfile.Path(
-                                zip_file, at=output[probe_name]["filename"]
+                        probe_type = output[probe_name]["type"]
+
+                        if probe_type == "FileJSON":
+                            output_file = pl.Path(
+                                osparc.FilesApi(self.api_client).download_file(
+                                    probe_output.id
+                                )
                             )
-                            file_results = json.loads(
-                                file_results_path.read_text()
+                            with zipfile.ZipFile(output_file, "r") as zip_file:
+                                file_results_path = zipfile.Path(
+                                    zip_file, at=output[probe_name]["filename"]
+                                )
+                                file_results = json.loads(
+                                    file_results_path.read_text()
+                                )
+
+                            output[probe_name]["value"] = file_results
+                        elif probe_type == "file":
+                            tmp_output_data_file = osparc.FilesApi(
+                                self.api_client
+                            ).download_file(probe_output.id)
+                            output_data_file = osparc.FilesApi(
+                                self.api_client
+                            ).upload_file(tmp_output_data_file)
+
+                            output[probe_name]["value"] = json.dumps(
+                                output_data_file.to_dict()
                             )
+                        elif probe_type == "integer":
+                            output[probe_name]["value"] = int(probe_output)
+                        elif probe_type == "float":
+                            output[probe_name]["value"] = float(probe_output)
+                        else:
+                            output[probe_name]["value"] = probe_output
 
-                        output[probe_name]["value"] = file_results
-                    elif probe_type == "file":
-                        tmp_output_data_file = osparc.FilesApi(
-                            self.api_client
-                        ).download_file(probe_output.id)
-                        output_data_file = osparc.FilesApi(
-                            self.api_client
-                        ).upload_file(tmp_output_data_file)
-
-                        output[probe_name]["value"] = json.dumps(
-                            output_data_file.to_dict()
-                        )
-                    elif probe_type == "integer":
-                        output[probe_name]["value"] = int(probe_output)
-                    elif probe_type == "float":
-                        output[probe_name]["value"] = float(probe_output)
-                    else:
-                        output[probe_name]["value"] = probe_output
-
-                logger.info(f"Worker has finished task: {task}")
-
-            self.studies_api.delete_study_job(
-                study_id=self.template_id, job_id=job.id
-            )
+                    logger.info(f"Worker has finished task: {task}")
 
             return task
 
