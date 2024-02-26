@@ -242,7 +242,7 @@ class MapRunner:
             logger.debug(f"Sending inputs: {job_inputs}")
 
             with create_study_job(
-                self.template_id, job_inputs, self.study_api
+                self.template_id, job_inputs, self.studies_api
             ) as job:
                 job_status = self.studies_api.start_study_job(
                     study_id=self.template_id, job_id=job.id
