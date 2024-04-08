@@ -10,15 +10,17 @@ import uuid
 import contextlib
 import tempfile
 import zipfile
+import http.server
+import socketserver
 
 import pathlib as pl
 import logging
+import threading
 
-logging.basicConfig(
-    level=logging.INFO, format="[%(filename)s:%(lineno)d] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="[%(filename)s:%(lineno)d] %(message)s")
 logger = logging.getLogger(__name__)
 
+HTTP_PORT = 8888
 
 POLLING_INTERVAL = 1  # second
 TEMPLATE_ID_KEY = "input_0"
@@ -32,11 +34,20 @@ def main():
     input_path = pl.Path(os.environ["DY_SIDECAR_PATH_INPUTS"])
     output_path = pl.Path(os.environ["DY_SIDECAR_PATH_OUTPUTS"])
 
-    pyrunner = MapRunner(
-        input_path, output_path, polling_interval=POLLING_INTERVAL
-    )
+    http_dir_path = pl.Path(__file__).parent / "http"
+
+    class HTTPHandler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs, directory=http_dir_path)
+
+    pyrunner = MapRunner(input_path, output_path, polling_interval=POLLING_INTERVAL)
 
     try:
+        logger.info(
+            f"Starting http server at port {HTTP_PORT} and serving path {http_dir_path}"
+        )
+        httpd = socketserver.TCPServer(("", HTTP_PORT), HTTPHandler)
+        threading.Thread(target=httpd.serve_forever).start()
         pyrunner.setup()
         pyrunner.start()
         pyrunner.teardown()
@@ -68,9 +79,7 @@ class MapRunner:
         self.input_tasks_path = self.input_tasks_dir_path / "input_tasks.json"
 
         self.output_tasks_dir_path = self.output_path / "output_1"
-        self.output_tasks_path = (
-            self.output_tasks_dir_path / "output_tasks.json"
-        )
+        self.output_tasks_path = self.output_tasks_dir_path / "output_tasks.json"
 
         if self.output_tasks_path.exists():
             self.output_tasks_path.unlink()
@@ -127,8 +136,7 @@ class MapRunner:
         ):
             if waiter % 10 == 0:
                 logger.info(
-                    f"Waiting for {INPUT_PARAMETERS_KEY} "
-                    "to exist in key_values..."
+                    f"Waiting for {INPUT_PARAMETERS_KEY} " "to exist in key_values..."
                 )
             key_values = json.loads(self.key_values_path.read_text())
             time.sleep(self.polling_interval)
@@ -145,9 +153,7 @@ class MapRunner:
         waiter = 0
         while not self.input_tasks_path.exists():
             if waiter % 10 == 0:
-                logger.info(
-                    f"Waiting for input file at {self.input_tasks_path}..."
-                )
+                logger.info(f"Waiting for input file at {self.input_tasks_path}...")
             time.sleep(self.polling_interval)
             waiter += 1
 
@@ -180,16 +186,12 @@ class MapRunner:
                     waiter += 1
                 else:
                     input_tasks = input_dict["tasks"]
-                    output_tasks = self.run_tasks(
-                        tasks_uuid, input_tasks, n_of_workers
-                    )
+                    output_tasks = self.run_tasks(tasks_uuid, input_tasks, n_of_workers)
                     output_tasks_content = json.dumps(
                         {"uuid": tasks_uuid, "tasks": output_tasks}
                     )
                     self.output_tasks_path.write_text(output_tasks_content)
-                    logger.info(
-                        f"Finished a set of tasks: {output_tasks_content}"
-                    )
+                    logger.info(f"Finished a set of tasks: {output_tasks_content}")
                     last_tasks_uuid = tasks_uuid
                     waiter = 0
             else:
@@ -218,9 +220,9 @@ class MapRunner:
                     tmp_input_file_path = tmp_dir_path / param_filename
                     tmp_input_file_path.write_text(json.dumps(param_value))
 
-                    input_data_file = osparc.FilesApi(
-                        self.api_client
-                    ).upload_file(file=tmp_input_file_path)
+                    input_data_file = osparc.FilesApi(self.api_client).upload_file(
+                        file=tmp_input_file_path
+                    )
                     job_inputs["values"][param_name] = input_data_file
                 elif param_type == "file":
                     file_info = json.loads(param_value)
@@ -248,10 +250,7 @@ class MapRunner:
                     study_id=self.template_id, job_id=job.id
                 )
 
-                while (
-                    job_status.state != "SUCCESS"
-                    and job_status.state != "FAILED"
-                ):
+                while job_status.state != "SUCCESS" and job_status.state != "FAILED":
                     job_status = self.studies_api.inspect_study_job(
                         study_id=self.template_id, job_id=job.id
                     )
@@ -268,9 +267,7 @@ class MapRunner:
 
                     for probe_name, probe_output in results.items():
                         if probe_name not in output:
-                            raise ValueError(
-                                f"Unknown probe in output: {probe_name}"
-                            )
+                            raise ValueError(f"Unknown probe in output: {probe_name}")
                         probe_type = output[probe_name]["type"]
 
                         if probe_type == "FileJSON":
@@ -283,9 +280,7 @@ class MapRunner:
                                 file_results_path = zipfile.Path(
                                     zip_file, at=output[probe_name]["filename"]
                                 )
-                                file_results = json.loads(
-                                    file_results_path.read_text()
-                                )
+                                file_results = json.loads(file_results_path.read_text())
 
                             output[probe_name]["value"] = file_results
                         elif probe_type == "file":

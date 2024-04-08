@@ -24,5 +24,7 @@ WORKDIR /home/osparcuser
 
 USER root
 
+EXPOSE 8888
+
 ENTRYPOINT [ "/bin/bash", "-c", "/docker/entrypoint.bash" ]
 CMD [ "/bin/bash", "-c", "/docker/runner.bash "]
