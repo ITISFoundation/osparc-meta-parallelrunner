@@ -1,5 +1,6 @@
 {
-    "uuid": "23423432",
+    "uuid": "dummy",
+    "caller_uuid": "dummy",
     "command": "run",
     "tasks": [
         {

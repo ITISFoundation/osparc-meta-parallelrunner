@@ -2,6 +2,7 @@
 
 SHELL = /bin/sh
 .DEFAULT_GOAL := help
+MAKEFLAGS += -j2
 
 export DOCKER_IMAGE_NAME ?= osparc-map
 export DOCKER_IMAGE_TAG ?= 0.0.5
@@ -34,11 +35,20 @@ clean:
 build: clean compose-spec	## build docker image
 	docker-compose build
 
-.PHONY: run-local
-run-local:	## runs image with local configuration
+validation-clean:
 	sudo rm -rf validation-tmp
 	cp -r validation validation-tmp
+	chmod -R 770 validation-tmp
+
+validation_client_run: validation-clean
+	pip install osparc-filecomms
+	VALIDATION_CLIENT_INPUT_PATH=validation-tmp/outputs/output_1 VALIDATION_CLIENT_OUTPUT_PATH=validation-tmp/inputs/input_2 python validation-client/client.py
+
+docker_compose: validation-clean
 	docker-compose --file docker-compose-local.yml up
+	
+.PHONY: run-local
+run-local: validation_client_run docker_compose	## runs image with local configuration
 
 .PHONY: publish-local
 publish-local: ## push to local throw away registry to test integration
