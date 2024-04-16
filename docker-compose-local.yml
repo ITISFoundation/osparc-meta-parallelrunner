@@ -1,7 +1,7 @@
 version: '3.7'
 services:
   osparc-map:
-    image: simcore/services/dynamic/osparc-map:0.0.5
+    image: simcore/services/dynamic/osparc-map:0.0.6
     ports:
       - "8888:8888"
     environment:

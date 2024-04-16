@@ -1,8 +1,8 @@
 name: MapService
 description: "MapService"
 key: simcore/services/dynamic/osparc-map
-version: 0.0.5
-integration-version: 0.0.5
+version: 0.0.6
+integration-version: 0.0.6
 type: dynamic
 authors:
   - name: Werner Van Geit

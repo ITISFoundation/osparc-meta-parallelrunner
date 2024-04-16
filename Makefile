@@ -5,7 +5,7 @@ SHELL = /bin/sh
 MAKEFLAGS += -j2
 
 export DOCKER_IMAGE_NAME ?= osparc-map
-export DOCKER_IMAGE_TAG ?= 0.0.5
+export DOCKER_IMAGE_TAG ?= 0.0.6
 
 define _bumpversion
 	# upgrades as $(subst $(1),,$@) version, commits and tags
