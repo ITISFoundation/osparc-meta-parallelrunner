@@ -40,7 +40,9 @@ def main():
 
     class HTTPHandler(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs, directory=http_dir_path)
+            super().__init__(
+                *args, **kwargs, directory=http_dir_path.resolve()
+            )
 
     maprunner = MapRunner(
         input_path, output_path, polling_interval=POLLING_INTERVAL
