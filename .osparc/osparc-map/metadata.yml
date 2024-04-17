@@ -6,9 +6,9 @@ integration-version: 0.0.6
 type: dynamic
 authors:
   - name: Werner Van Geit
-    email: 18575092+wvangeit@users.noreply.github.com
+    email: vangeit@itis.swiss
     affiliation: IT'IS Foundation
-contact: 18575092+wvangeit@users.noreply.github.com
+contact: vangeit@itis.swiss
 inputs:
   input_0:
     displayOrder: 0.0
