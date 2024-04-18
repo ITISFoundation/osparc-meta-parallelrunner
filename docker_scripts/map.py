@@ -111,7 +111,7 @@ class MapRunner:
     def setup(self):
         """Setup the Python Runner"""
         self.osparc_cfg = osparc.Configuration(
-            host="10.43.103.149.nip.io:8006",
+            host=os.environ["OSPARC_API_HOST"],
             username=os.environ["OSPARC_API_KEY"],
             password=os.environ["OSPARC_API_SECRET"],
         )
