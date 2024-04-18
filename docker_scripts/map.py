@@ -110,6 +110,9 @@ class MapRunner:
 
     def setup(self):
         """Setup the Python Runner"""
+        logger.info(f"Using host: [{os.environ['OSPARC_API_HOST']}]")
+        logger.info(f"Using key: [{os.environ['OSPARC_API_KEY']}]")
+        logger.info(f"Using secret: [{os.environ['OSPARC_API_SECRET']}]")
         self.osparc_cfg = osparc.Configuration(
             host=os.environ["OSPARC_API_HOST"],
             username=os.environ["OSPARC_API_KEY"],
