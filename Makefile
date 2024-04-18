@@ -5,7 +5,7 @@ SHELL = /bin/sh
 MAKEFLAGS += -j2
 
 export DOCKER_IMAGE_NAME ?= osparc-map
-export DOCKER_IMAGE_TAG ?= 0.0.6
+export DOCKER_IMAGE_TAG ?= 0.0.7
 
 export MASTER_REGISTRY ?= registry.osparc-master.speag.com
 export LOCAL_REGISTRY ?= registry:5000
