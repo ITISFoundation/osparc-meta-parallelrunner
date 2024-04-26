@@ -7,6 +7,7 @@ MAKEFLAGS += -j2
 export DOCKER_IMAGE_NAME ?= osparc-map
 export DOCKER_IMAGE_TAG ?= 0.0.7
 
+export MASTER_AWS_REGISTRY ?= registry.osparc-master-zmt.click
 export MASTER_REGISTRY ?= registry.osparc-master.speag.com
 export LOCAL_REGISTRY ?= registry:5000
 
@@ -65,6 +66,12 @@ publish-master: ## push to local throw away registry to test integration
 	docker tag simcore/services/dynamic/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} $(MASTER_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 	docker push $(MASTER_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 	@curl $(MASTER_REGISTRY)/v2/_catalog | jq
+
+.PHONY: publish-master-aws
+publish-master-aws: ## push to local throw away registry to test integration
+	docker tag simcore/services/dynamic/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} $(MASTER_AWS_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
+	docker push $(MASTER_AWS_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
+	@curl $(MASTER_AWS_REGISTRY)/v2/_catalog | jq
 
 .PHONY: help
 help: ## this colorful help
