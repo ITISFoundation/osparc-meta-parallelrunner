@@ -166,10 +166,14 @@ class MapRunner:
         while (
             INPUT_PARAMETERS_KEY not in key_values
             or key_values[INPUT_PARAMETERS_KEY]["value"] is None
+            or TEMPLATE_ID_KEY not in key_values
+            or key_values[TEMPLATE_ID_KEY]["value"] is None
+            or N_OF_WORKERS_KEY not in key_values
+            or key_values[N_OF_WORKERS_KEY]["value"] is None
         ):
             if waiter % 10 == 0:
                 logger.info(
-                    f"Waiting for {INPUT_PARAMETERS_KEY} "
+                    "Waiting for all required keys to "
                     "to exist in key_values..."
                 )
             key_values = json.loads(self.key_values_path.read_text())
