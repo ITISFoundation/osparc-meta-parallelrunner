@@ -1,8 +1,8 @@
 name: MapService
 description: "MapService"
 key: simcore/services/dynamic/osparc-meta-parallelrunner
-version: 0.0.7
-integration-version: 0.0.7
+version: 0.0.8
+integration-version: 0.0.8
 type: dynamic
 authors:
   - name: Werner Van Geit
