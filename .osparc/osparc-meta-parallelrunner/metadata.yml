@@ -1,5 +1,5 @@
-name: MapService
-description: "MapService"
+name: ParallelRunnerService
+description: "ParallelRunnerService"
 key: simcore/services/dynamic/osparc-meta-parallelrunner
 version: 0.0.8
 integration-version: 0.0.8
