@@ -1,4 +1,4 @@
 services:
-  osparc-map:
+  osparc-meta-parallelrunner:
     build:
       dockerfile: Dockerfile

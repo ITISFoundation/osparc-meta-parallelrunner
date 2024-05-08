@@ -22,10 +22,10 @@ paths-mapping:
 compose-spec:
   version: "3.7"
   services:
-    osparc-map:
-      image: $${SIMCORE_REGISTRY}/simcore/services/dynamic/osparc-map:$${SERVICE_VERSION}
+    osparc-meta-parallelrunner:
+      image: $${SIMCORE_REGISTRY}/simcore/services/dynamic/osparc-meta-parallelrunner:$${SERVICE_VERSION}
       environment:
         - OSPARC_API_HOST=$${OSPARC_VARIABLE_API_HOST}
         - OSPARC_API_KEY=$${OSPARC_VARIABLE_API_KEY}
         - OSPARC_API_SECRET=$${OSPARC_VARIABLE_API_SECRET}
-container-http-entrypoint: osparc-map
+container-http-entrypoint: osparc-meta-parallelrunner
