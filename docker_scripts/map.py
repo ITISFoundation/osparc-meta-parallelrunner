@@ -195,6 +195,7 @@ class MapRunner:
                 f"is allowed ({MAX_N_OF_WORKERS}), limiting value "
                 "to maximum amount"
             )
+            n_of_workers = MAX_N_OF_WORKERS
 
         waiter = 0
         while not self.input_tasks_path.exists():
