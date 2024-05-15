@@ -190,9 +190,11 @@ class MapRunner:
         if n_of_workers is None:
             raise ValueError("Number of workers can't be None")
         elif n_of_workers > MAX_N_OF_WORKERS:
-            logger.warning("Attempt to set number of workers to more than "
-                         f"is allowed ({MAX_N_OF_WORKERS}), limiting value"
-                         "to maximum amount")
+            logger.warning(
+                "Attempt to set number of workers to more than "
+                f"is allowed ({MAX_N_OF_WORKERS}), limiting value "
+                "to maximum amount"
+            )
 
         waiter = 0
         while not self.input_tasks_path.exists():
