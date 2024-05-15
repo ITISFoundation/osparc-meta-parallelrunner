@@ -17,7 +17,7 @@ make run-local
 Deploy to local **o<sup>2</sup>S<sup>2</sup>PARC** registry
 -------------------------------------------------------
 
-To run a local test:
+To run publish to the local registry:
 
 ```
 make publish-local
