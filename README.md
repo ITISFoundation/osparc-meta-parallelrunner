@@ -20,6 +20,7 @@ Deploy to local **o<sup>2</sup>S<sup>2</sup>PARC** registry
 To run publish to the local registry:
 
 ```
+make build
 make publish-local
 ```
 
