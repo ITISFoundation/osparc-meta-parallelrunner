@@ -255,7 +255,7 @@ class MapRunner:
     def run_tasks(self, tasks_uuid, input_tasks, n_of_workers):
         logger.info(f"Evaluating: {input_tasks}")
 
-        n_of_finished_tasks = 0
+        self.n_of_finished_tasks = 0
 
         def map_func(task, trial_number=1):
             try:
@@ -370,11 +370,11 @@ class MapRunner:
                             else:
                                 output[probe_name]["value"] = probe_output
 
-                        self.n_finished_tasks += 1
+                        self.n_of_finished_tasks += 1
 
                         logger.info(
                             "Worker has finished task "
-                            f"{n_of_finished_tasks} of {len(input_tasks)}"
+                            f"{self.n_of_finished_tasks} of {len(input_tasks)}"
                         )
             except Exception as error:
                 if trial_number >= MAX_TRIALS:
