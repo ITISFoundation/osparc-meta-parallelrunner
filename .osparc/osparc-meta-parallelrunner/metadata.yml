@@ -1,7 +1,7 @@
 name: ParallelRunnerService
 description: "ParallelRunnerService"
 key: simcore/services/dynamic/osparc-meta-parallelrunner
-version: 0.0.10
+version: 0.0.11
 integration-version: 2.0.0
 type: dynamic
 authors:
