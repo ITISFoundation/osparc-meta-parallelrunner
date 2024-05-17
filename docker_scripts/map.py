@@ -1,4 +1,5 @@
 import contextlib
+import getpass
 import http.server
 import json
 import logging
@@ -147,8 +148,6 @@ class MapRunner:
         """Start the Python Runner"""
         logger.info("Starting map ...")
 
-        import getpass
-
         logger.info(f"User: {getpass.getuser()}, UID: {os.getuid()}")
         logger.info(f"Input path: {self.input_path.resolve()}")
 
@@ -176,7 +175,7 @@ class MapRunner:
             if waiter % 10 == 0:
                 logger.info(
                     "Waiting for all required keys to "
-                    "to exist in key_values..."
+                    f"exist in key_values, current content: {key_values}..."
                 )
             key_values = json.loads(self.key_values_path.read_text())
             time.sleep(self.polling_interval)
@@ -255,6 +254,8 @@ class MapRunner:
 
     def run_tasks(self, tasks_uuid, input_tasks, n_of_workers):
         logger.info(f"Evaluating: {input_tasks}")
+
+        self.n_of_finished_tasks = 0
 
         def map_func(task, trial_number=1):
             try:
@@ -369,7 +370,12 @@ class MapRunner:
                             else:
                                 output[probe_name]["value"] = probe_output
 
-                        logger.info(f"Worker has finished task: {task}")
+                        self.n_of_finished_tasks += 1
+
+                        logger.info(
+                            "Worker has finished task "
+                            f"{self.n_of_finished_tasks} of {len(input_tasks)}"
+                        )
             except Exception as error:
                 if trial_number >= MAX_TRIALS:
                     logger.info(
@@ -390,7 +396,9 @@ class MapRunner:
             logger.info("Map in test mode, just returning input")
             return input_tasks
 
-        logger.info(f"Starting tasks on {n_of_workers} workers")
+        logger.info(
+            f"Starting {len(input_tasks)} tasks on {n_of_workers} workers"
+        )
         with pathos.pools.ThreadPool(nodes=n_of_workers) as pool:
             output_tasks = list(pool.map(map_func, input_tasks))
             pool.close()
