@@ -37,7 +37,7 @@ clean:
 
 .PHONY: build
 build: clean compose-spec	## build docker image
-	docker-compose build
+	docker compose build
 
 validation-clean:
 	sudo rm -rf validation-tmp
@@ -49,8 +49,8 @@ validation_client_run: validation-clean
 	VALIDATION_CLIENT_INPUT_PATH=validation-tmp/outputs/output_1 VALIDATION_CLIENT_OUTPUT_PATH=validation-tmp/inputs/input_2 python validation-client/client.py
 
 docker_compose: validation-clean
-	docker-compose down
-	docker-compose --file docker-compose-local.yml up
+	docker compose down
+	docker compose --file docker-compose-local.yml up
 	
 .PHONY: run-local
 run-local: validation_client_run docker_compose	## runs image with local configuration
