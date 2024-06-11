@@ -196,19 +196,19 @@ class MapRunner:
             )
             n_of_workers = MAX_N_OF_WORKERS
 
-        waiter = 0
-        while not self.input_tasks_path.exists():
-            if waiter % 10 == 0:
-                logger.info(
-                    f"Waiting for input file at {self.input_tasks_path}..."
-                )
-                self.handshaker.retry_last_write()
-            time.sleep(self.polling_interval)
-            waiter += 1
-
         last_tasks_uuid = ""
         waiter = 0
         while True:
+            waiter = 0
+            while not self.input_tasks_path.exists():
+                if waiter % 10 == 0:
+                    logger.info(
+                        f"Waiting for input file at {self.input_tasks_path}..."
+                    )
+                    self.handshaker.retry_last_write()
+                time.sleep(self.polling_interval)
+                waiter += 1
+
             input_dict = json.loads(self.input_tasks_path.read_text())
             command = input_dict["command"]
             caller_uuid = input_dict["caller_uuid"]
