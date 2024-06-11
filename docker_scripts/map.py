@@ -197,7 +197,7 @@ class MapRunner:
             n_of_workers = MAX_N_OF_WORKERS
 
         last_tasks_uuid = ""
-        waiter = 0
+        waiter_2 = 0
         while True:
             waiter = 0
             while not self.input_tasks_path.exists():
@@ -214,13 +214,13 @@ class MapRunner:
             caller_uuid = input_dict["caller_uuid"]
             map_uuid = input_dict["map_uuid"]
             if caller_uuid != self.caller_uuid or map_uuid != self.uuid:
-                if waiter % 10 == 0:
+                if waiter_2 % 10 == 0:
                     logger.info(
                         "Received command with wrong caller uuid: "
                         f"{caller_uuid} or map uuid: {map_uuid}"
                     )
                 time.sleep(self.polling_interval)
-                waiter += 1
+                waiter_2 += 1
                 continue
 
             if command == "stop":
@@ -229,10 +229,10 @@ class MapRunner:
                 tasks_uuid = input_dict["uuid"]
 
                 if tasks_uuid == last_tasks_uuid:
-                    if waiter % 10 == 0:
+                    if waiter_2 % 10 == 0:
                         logger.info("Waiting for new tasks uuid")
                     time.sleep(self.polling_interval)
-                    waiter += 1
+                    waiter_2 += 1
                 else:
                     input_tasks = input_dict["tasks"]
                     output_tasks = self.run_tasks(
@@ -246,7 +246,7 @@ class MapRunner:
                         f"Finished a set of tasks: {output_tasks_content}"
                     )
                     last_tasks_uuid = tasks_uuid
-                    waiter = 0
+                    waiter_2 = 0
             else:
                 raise ValueError("Command unknown: {command}")
 
