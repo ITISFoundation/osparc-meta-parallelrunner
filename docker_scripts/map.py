@@ -83,7 +83,7 @@ def create_study_job(template_id, job_inputs, studies_api):
         except osparc_client.exceptions.ApiException as api_exception:
             if n_of_create_attempts >= MAX_JOB_CREATE_ATTEMPTS:
                 raise Exception(
-                    f"Tried {n_of_create_attempts} to create a job from "
+                    f"Tried {n_of_create_attempts} times to create a job from "
                     "the study, but failed"
                 )
             else:
