@@ -80,13 +80,14 @@ def create_study_job(template_id, job_inputs, studies_api):
                 job_inputs=job_inputs,
             )
             break
-        except osparc_client.exceptions.ApiException:
+        except osparc_client.exceptions.ApiException as api_exception:
             if n_of_create_attempts >= MAX_JOB_CREATE_ATTEMPTS:
                 raise Exception(
-                    f"Tried {n_of_create_attempts} to create a job from "
+                    f"Tried {n_of_create_attempts} times to create a job from "
                     "the study, but failed"
                 )
             else:
+                logger.exception(api_exception)
                 logger.info(
                     "Received an API Exception from server "
                     "when creating job, retrying..."
@@ -196,31 +197,31 @@ class MapRunner:
             )
             n_of_workers = MAX_N_OF_WORKERS
 
-        waiter = 0
-        while not self.input_tasks_path.exists():
-            if waiter % 10 == 0:
-                logger.info(
-                    f"Waiting for input file at {self.input_tasks_path}..."
-                )
-                self.handshaker.retry_last_write()
-            time.sleep(self.polling_interval)
-            waiter += 1
-
         last_tasks_uuid = ""
-        waiter = 0
+        waiter_wrong_uuid = 0
         while True:
+            waiter_input_exists = 0
+            while not self.input_tasks_path.exists():
+                if waiter_input_exists % 10 == 0:
+                    logger.info(
+                        f"Waiting for input file at {self.input_tasks_path}..."
+                    )
+                    self.handshaker.retry_last_write()
+                time.sleep(self.polling_interval)
+                waiter_input_exists += 1
+
             input_dict = json.loads(self.input_tasks_path.read_text())
             command = input_dict["command"]
             caller_uuid = input_dict["caller_uuid"]
             map_uuid = input_dict["map_uuid"]
             if caller_uuid != self.caller_uuid or map_uuid != self.uuid:
-                if waiter % 10 == 0:
+                if waiter_wrong_uuid % 10 == 0:
                     logger.info(
                         "Received command with wrong caller uuid: "
                         f"{caller_uuid} or map uuid: {map_uuid}"
                     )
                 time.sleep(self.polling_interval)
-                waiter += 1
+                waiter_wrong_uuid += 1
                 continue
 
             if command == "stop":
@@ -229,10 +230,10 @@ class MapRunner:
                 tasks_uuid = input_dict["uuid"]
 
                 if tasks_uuid == last_tasks_uuid:
-                    if waiter % 10 == 0:
+                    if waiter_wrong_uuid % 10 == 0:
                         logger.info("Waiting for new tasks uuid")
                     time.sleep(self.polling_interval)
-                    waiter += 1
+                    waiter_wrong_uuid += 1
                 else:
                     input_tasks = input_dict["tasks"]
                     output_tasks = self.run_tasks(
@@ -246,7 +247,7 @@ class MapRunner:
                         f"Finished a set of tasks: {output_tasks_content}"
                     )
                     last_tasks_uuid = tasks_uuid
-                    waiter = 0
+                    waiter_wrong_uuid = 0
             else:
                 raise ValueError("Command unknown: {command}")
 
