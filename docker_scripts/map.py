@@ -100,8 +100,12 @@ def create_study_job(template_id, job_inputs, studies_api):
 
 
 class MapRunner:
-    def __init__(self, input_path, output_path, polling_interval=1):
+    def __init__(
+        self, input_path, output_path, polling_interval=1, batch_mode=False
+    ):
         """Constructor"""
+
+        self.batch_mode = batch_mode
 
         self.input_path = input_path  # path where osparc write all our input
         self.output_path = output_path  # path where osparc write all our input
@@ -236,9 +240,22 @@ class MapRunner:
                     waiter_wrong_uuid += 1
                 else:
                     input_tasks = input_dict["tasks"]
-                    output_tasks = self.run_tasks(
-                        tasks_uuid, input_tasks, n_of_workers
+
+                    if self.batch_mode:
+                        n_of_batches = n_of_workers
+                    else:
+                        n_of_batches = len(input_tasks)
+
+                    input_batches = self.batch_input_tasks(
+                        input_tasks, n_of_batches
                     )
+
+                    output_batches = self.run_batches(
+                        tasks_uuid, input_batches, n_of_workers
+                    )
+
+                    output_tasks = self.unbatch_output_tasks(output_batches)
+
                     output_tasks_content = json.dumps(
                         {"uuid": tasks_uuid, "tasks": output_tasks}
                     )
@@ -253,155 +270,203 @@ class MapRunner:
 
             time.sleep(self.polling_interval)
 
-    def run_tasks(self, tasks_uuid, input_tasks, n_of_workers):
-        logger.info(f"Evaluating: {input_tasks}")
+    def batch_input_tasks(self, input_tasks, n_of_batches):
+        batches = [[] for _ in range(n_of_batches)]
 
-        self.n_of_finished_tasks = 0
+        for task_i, input_task in enumerate(input_tasks):
+            batch_id = task_i % n_of_batches
+            batches[batch_id].append(input_task)
+        return batches
 
-        def map_func(task, trial_number=1):
-            try:
-                logger.info(f"Running worker for task: {task}")
+    def unbatch_output_tasks(self, batches):
+        output_tasks = []
+        n_of_tasks = sum(len(batch) for batch in batches)
 
-                input = task["input"]
-                output = task["output"]
+        for task_i in range(n_of_tasks):
+            batch_id = task_i % len(batches)
+            output_tasks.append(batches[batch_id].pop(0))
+        return output_tasks
 
-                job_inputs = {"values": {}}
+    def create_job_inputs(self, batch):
+        """Create job inputs"""
 
-                for param_name, param_input in input.items():
-                    param_type = param_input["type"]
-                    param_value = param_input["value"]
-                    if param_type == "FileJSON":
-                        param_filename = param_input["filename"]
-                        tmp_dir = tempfile.TemporaryDirectory()
-                        tmp_dir_path = pl.Path(tmp_dir.name)
-                        tmp_input_file_path = tmp_dir_path / param_filename
-                        tmp_input_file_path.write_text(json.dumps(param_value))
+        job_inputs = {"values": {}}
 
-                        input_data_file = osparc.FilesApi(
-                            self.api_client
-                        ).upload_file(file=tmp_input_file_path)
-                        job_inputs["values"][param_name] = input_data_file
-                    elif param_type == "file":
-                        file_info = json.loads(param_value)
-                        input_data_file = osparc_client.models.file.File(
-                            id=file_info["id"],
-                            filename=file_info["filename"],
-                            content_type=file_info["content_type"],
-                            checksum=file_info["checksum"],
-                            e_tag=file_info["e_tag"],
-                        )
-                        job_inputs["values"][param_name] = input_data_file
-                    elif param_type == "integer":
-                        job_inputs["values"][param_name] = int(param_value)
-                    elif param_type == "float":
-                        job_inputs["values"][param_name] = float(param_value)
-                    else:
-                        job_inputs["values"][param_name] = param_value
+        for task in batch:
+            input = task["input"]
+            for param_name, param_input in input.items():
+                param_type = param_input["type"]
+                param_value = param_input["value"]
+                if param_type == "FileJSON":
+                    param_filename = param_input["filename"]
+                    tmp_dir = tempfile.TemporaryDirectory()
+                    tmp_dir_path = pl.Path(tmp_dir.name)
+                    tmp_input_file_path = tmp_dir_path / param_filename
+                    tmp_input_file_path.write_text(json.dumps(param_value))
 
-                logger.debug(f"Sending inputs: {job_inputs}")
-
-                with create_study_job(
-                    self.template_id, job_inputs, self.studies_api
-                ) as job:
-                    job_status = self.studies_api.start_study_job(
-                        study_id=self.template_id, job_id=job.id
+                    input_data_file = osparc.FilesApi(
+                        self.api_client
+                    ).upload_file(file=tmp_input_file_path)
+                    processed_param_value = input_data_file
+                elif param_type == "file":
+                    file_info = json.loads(param_value)
+                    input_data_file = osparc_client.models.file.File(
+                        id=file_info["id"],
+                        filename=file_info["filename"],
+                        content_type=file_info["content_type"],
+                        checksum=file_info["checksum"],
+                        e_tag=file_info["e_tag"],
                     )
+                    processed_param_value = input_data_file
+                elif param_type == "integer":
+                    processed_param_value = int(param_value)
+                elif param_type == "float":
+                    processed_param_value = float(param_value)
+                else:
+                    processed_param_value = param_value
 
-                    while (
-                        job_status.state != "SUCCESS"
-                        and job_status.state != "FAILED"
-                    ):
-                        job_status = self.studies_api.inspect_study_job(
-                            study_id=self.template_id, job_id=job.id
+                if self.batch_mode:
+                    if param_name not in job_inputs:
+                        job_inputs["values"][param_name] = []
+                    job_inputs["values"][param_name].append(
+                        processed_param_value
+                    )
+                else:
+                    assert len(batch) == 1
+                    job_inputs["values"][param_name] = processed_param_value
+
+        return job_inputs
+
+    def run_job(self, job_inputs):
+        """Run a job with given inputs"""
+
+        logger.debug(f"Sending inputs: {job_inputs}")
+
+        if self.template_id == "TEST_UUID":
+            logger.info("Map in test mode, just returning input")
+            self.n_of_finished_batches += 1
+
+            return job_inputs, "SUCCESS"
+
+        with create_study_job(
+            self.template_id, job_inputs, self.studies_api
+        ) as job:
+            job_status = self.studies_api.start_study_job(
+                study_id=self.template_id, job_id=job.id
+            )
+
+            while (
+                job_status.state != "SUCCESS" and job_status.state != "FAILED"
+            ):
+                job_status = self.studies_api.inspect_study_job(
+                    study_id=self.template_id, job_id=job.id
+                )
+                time.sleep(1)
+
+            status = job_status.state
+
+            if job_status.state == "FAILED":
+                logger.error(f"Batch failed: {job_inputs}")
+                raise Exception("Job returned a failed status")
+            else:
+                job_outputs = self.studies_api.get_study_job_outputs(
+                    study_id=self.template_id, job_id=job.id
+                ).results
+
+                self.n_of_finished_batches += 1
+
+        return job_outputs, status
+
+    def process_job_outputs(self, results, batch):
+        if self.template_id == "TEST_UUID":
+            logger.info("Map in test mode, just returning input")
+
+            return batch
+
+        for task_i, task in enumerate(batch):
+            output = task["output"]
+            for probe_name, probe_outputs in results.items():
+                probe_output = probe_outputs[task_i]
+                if probe_name not in output:
+                    raise ValueError(f"Unknown probe in output: {probe_name}")
+                probe_type = output[probe_name]["type"]
+
+                if probe_type == "FileJSON":
+                    output_file = pl.Path(
+                        osparc.FilesApi(self.api_client).download_file(
+                            probe_output.id
                         )
-                        time.sleep(1)
-
-                    task["status"] = job_status.state
-
-                    if job_status.state == "FAILED":
-                        logger.error(f"Task failed: {task}")
-                        raise Exception("Job returned a failed status")
-                    else:
-                        results = self.studies_api.get_study_job_outputs(
-                            study_id=self.template_id, job_id=job.id
-                        ).results
-
-                        for probe_name, probe_output in results.items():
-                            if probe_name not in output:
-                                raise ValueError(
-                                    f"Unknown probe in output: {probe_name}"
-                                )
-                            probe_type = output[probe_name]["type"]
-
-                            if probe_type == "FileJSON":
-                                output_file = pl.Path(
-                                    osparc.FilesApi(
-                                        self.api_client
-                                    ).download_file(probe_output.id)
-                                )
-                                with zipfile.ZipFile(
-                                    output_file, "r"
-                                ) as zip_file:
-                                    file_results_path = zipfile.Path(
-                                        zip_file,
-                                        at=output[probe_name]["filename"],
-                                    )
-                                    file_results = json.loads(
-                                        file_results_path.read_text()
-                                    )
-
-                                output[probe_name]["value"] = file_results
-                            elif probe_type == "file":
-                                tmp_output_data_file = osparc.FilesApi(
-                                    self.api_client
-                                ).download_file(probe_output.id)
-                                output_data_file = osparc.FilesApi(
-                                    self.api_client
-                                ).upload_file(tmp_output_data_file)
-
-                                output[probe_name]["value"] = json.dumps(
-                                    output_data_file.to_dict()
-                                )
-                            elif probe_type == "integer":
-                                output[probe_name]["value"] = int(probe_output)
-                            elif probe_type == "float":
-                                output[probe_name]["value"] = float(
-                                    probe_output
-                                )
-                            else:
-                                output[probe_name]["value"] = probe_output
-
-                        self.n_of_finished_tasks += 1
-
-                        logger.info(
-                            "Worker has finished task "
-                            f"{self.n_of_finished_tasks} of {len(input_tasks)}"
+                    )
+                    with zipfile.ZipFile(output_file, "r") as zip_file:
+                        file_results_path = zipfile.Path(
+                            zip_file,
+                            at=output[probe_name]["filename"],
                         )
+                        file_results = json.loads(
+                            file_results_path.read_text()
+                        )
+
+                    output[probe_name]["value"] = file_results
+                elif probe_type == "file":
+                    tmp_output_data_file = osparc.FilesApi(
+                        self.api_client
+                    ).download_file(probe_output.id)
+                    output_data_file = osparc.FilesApi(
+                        self.api_client
+                    ).upload_file(tmp_output_data_file)
+
+                    output[probe_name]["value"] = json.dumps(
+                        output_data_file.to_dict()
+                    )
+                elif probe_type == "integer":
+                    output[probe_name]["value"] = int(probe_output)
+                elif probe_type == "float":
+                    output[probe_name]["value"] = float(probe_output)
+                else:
+                    output[probe_name]["value"] = probe_output
+
+    def run_batches(self, tasks_uuid, input_batches, n_of_workers):
+        """Run the tasks"""
+
+        logger.info(f"Evaluating: {input_batches}")
+
+        self.n_of_finished_batches = 0
+
+        def map_func(batch, trial_number=1):
+            try:
+                logger.info(f"Running worker for batch: {batch}")
+
+                job_inputs = self.create_job_inputs(batch)
+
+                job_outputs, status = self.run_job(job_inputs)
+
+                batch = self.process_job_outputs(job_outputs, batch)
+
+                logger.info(
+                    "Worker has finished batch "
+                    f"{self.n_of_finished_batches} of {len(input_batches)}"
+                )
             except Exception as error:
                 if trial_number >= MAX_TRIALS:
                     logger.info(
-                        f"Task {task} failed with error {error} in "
+                        f"Batch {batch} failed with error {error} in "
                         f"trial {trial_number}, not retrying, raising error"
                     )
                     raise error
                 else:
                     logger.info(
-                        f"Task {task} failed with error {error} in "
+                        f"Batch {batch} failed with error {error} in "
                         f"trial {trial_number}, retrying "
                     )
-                    task = map_func(task, trial_number=trial_number + 1)
+                    batch = map_func(batch, trial_number=trial_number + 1)
 
-            return task
-
-        if self.template_id == "TEST_UUID":
-            logger.info("Map in test mode, just returning input")
-            return input_tasks
+            return batch
 
         logger.info(
-            f"Starting {len(input_tasks)} tasks on {n_of_workers} workers"
+            f"Starting {len(input_batches)} batches on {n_of_workers} workers"
         )
         with pathos.pools.ThreadPool(nodes=n_of_workers) as pool:
-            output_tasks = list(pool.map(map_func, input_tasks))
+            output_tasks = list(pool.map(map_func, input_batches))
             pool.close()
             pool.join()
             pool.clear()  # Pool is singleton, need to clear old pool

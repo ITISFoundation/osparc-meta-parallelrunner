@@ -52,9 +52,15 @@ def main():
 
     output_tasks = json.loads(output_tasks_path.read_text())
 
-    assert output_tasks["uuid"] == task_uuid
-
     logger.info(output_tasks)
+
+    assert output_tasks["uuid"] == task_uuid
+    for task_id in range(len(input_tasks["tasks"])):
+        for input_name in input_tasks["tasks"][task_id]["input"].keys():
+            assert (
+                output_tasks["tasks"][task_id]["input"][input_name]["value"]
+                == input_tasks["tasks"][task_id]["input"][input_name]["value"]
+            )
 
     stop_command = {
         "caller_uuid": client_uuid,
