@@ -44,6 +44,7 @@ class ParallelRunner:
         max_job_create_attempts=MAX_JOB_CREATE_ATTEMPTS,
     ):
         """Constructor"""
+        self.test_mode = False
 
         self.batch_mode = batch_mode
         self.max_n_of_workers = max_n_of_workers
@@ -89,8 +90,12 @@ class ParallelRunner:
             username=os.environ["OSPARC_API_KEY"],
             password=os.environ["OSPARC_API_SECRET"],
         )
-        self.api_client = osparc.ApiClient(self.osparc_cfg)
-        self.studies_api = osparc_client.StudiesApi(self.api_client)
+        if self.test_mode:
+            self.api_client = None
+            self.studies_api = None
+        else:
+            self.api_client = osparc.ApiClient(self.osparc_cfg)
+            self.studies_api = osparc_client.StudiesApi(self.api_client)
 
     def start(self):
         """Start the Python Runner"""
@@ -132,6 +137,11 @@ class ParallelRunner:
         self.template_id = key_values[TEMPLATE_ID_KEY]["value"]
         if self.template_id is None:
             raise ValueError("Template ID can't be None")
+
+        if self.template_id == "TEST_UUID":
+            self.test_mode = True
+            self.api_client = None
+            self.studies_api = None
 
         n_of_workers = key_values[N_OF_WORKERS_KEY]["value"]
         if n_of_workers is None:
@@ -247,20 +257,26 @@ class ParallelRunner:
                     tmp_input_file_path = tmp_dir_path / param_filename
                     tmp_input_file_path.write_text(json.dumps(param_value))
 
-                    input_data_file = osparc.FilesApi(
-                        self.api_client
-                    ).upload_file(file=tmp_input_file_path)
-                    processed_param_value = input_data_file
+                    if self.test_mode:
+                        processed_param_value = None
+                    else:
+                        input_data_file = osparc.FilesApi(
+                            self.api_client
+                        ).upload_file(file=tmp_input_file_path)
+                        processed_param_value = input_data_file
                 elif param_type == "file":
                     file_info = json.loads(param_value)
-                    input_data_file = osparc_client.models.file.File(
-                        id=file_info["id"],
-                        filename=file_info["filename"],
-                        content_type=file_info["content_type"],
-                        checksum=file_info["checksum"],
-                        e_tag=file_info["e_tag"],
-                    )
-                    processed_param_value = input_data_file
+                    if self.test_mode:
+                        processed_param_value = None
+                    else:
+                        input_data_file = osparc_client.models.file.File(
+                            id=file_info["id"],
+                            filename=file_info["filename"],
+                            content_type=file_info["content_type"],
+                            checksum=file_info["checksum"],
+                            e_tag=file_info["e_tag"],
+                        )
+                        processed_param_value = input_data_file
                 elif param_type == "integer":
                     processed_param_value = int(param_value)
                 elif param_type == "float":
@@ -285,7 +301,7 @@ class ParallelRunner:
 
         logger.debug(f"Sending inputs: {job_inputs}")
 
-        if self.template_id == "TEST_UUID":
+        if self.test_mode:
             logger.info("Map in test mode, just returning input")
             self.n_of_finished_batches += 1
 
@@ -423,8 +439,9 @@ class ParallelRunner:
         return output_tasks
 
     def teardown(self):
-        logger.info("Closing map ...")
-        self.api_client.close()
+        logger.info("Closing parallelrunner ...")
+        if self.api_client:
+            self.api_client.close()
 
     def read_keyvalues(self):
         """Read keyvalues file"""

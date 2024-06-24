@@ -4,7 +4,7 @@ SHELL = /bin/sh
 .DEFAULT_GOAL := help
 MAKEFLAGS += -j2
 
-export DOCKER_IMAGE_NAME ?= osparc-map
+export DOCKER_IMAGE_NAME ?= osparc-meta-parallelrunner
 export DOCKER_IMAGE_TAG ?= 0.0.14
 
 export MASTER_AWS_REGISTRY ?= registry.osparc-master-zmt.click
