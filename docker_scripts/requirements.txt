@@ -1,1 +1,2 @@
 osparc_filecomms
+pydantic-settings

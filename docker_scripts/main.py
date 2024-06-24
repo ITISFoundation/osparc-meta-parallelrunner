@@ -1,9 +1,11 @@
 import http.server
 import logging
-import os
 import pathlib as pl
 import socketserver
 import threading
+
+import pydantic as pyda
+import pydantic_settings
 
 import parallelrunner
 
@@ -18,8 +20,9 @@ HTTP_PORT = 8888
 def main():
     """Main"""
 
-    input_path = pl.Path(os.environ["DY_SIDECAR_PATH_INPUTS"])
-    output_path = pl.Path(os.environ["DY_SIDECAR_PATH_OUTPUTS"])
+    settings = MainSettings()
+    settings = settings.parse_file(settings.input_path / "parallelrunner.json")
+    logging.info(f"Received the following settings: {settings}")
 
     http_dir_path = pl.Path(__file__).parent / "http"
 
@@ -29,10 +32,7 @@ def main():
                 *args, **kwargs, directory=http_dir_path.resolve()
             )
 
-    maprunner = parallelrunner.ParallelRunner(
-        input_path,
-        output_path,
-    )
+    maprunner = parallelrunner.ParallelRunner(**settings.dict())
 
     try:
         logger.info(
@@ -47,6 +47,12 @@ def main():
             httpd.shutdown()
     except Exception as err:  # pylint: disable=broad-except
         logger.error(f"{err} . Stopping %s", exc_info=True)
+
+
+class MainSettings(pydantic_settings.BaseSettings):
+    batch_mode: bool = False
+    input_path: pyda.DirectoryPath = pyda.Field(alias="DY_SIDECAR_PATH_INPUTS")
+    output_path: pl.Path = pyda.Field(alias="DY_SIDECAR_PATH_OUTPUTS")
 
 
 if __name__ == "__main__":
