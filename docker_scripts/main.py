@@ -1,13 +1,9 @@
-import contextlib
 import http.server
 import logging
 import os
 import pathlib as pl
 import socketserver
 import threading
-
-import osparc_client
-import osparc_client.models.file
 
 import parallelrunner
 
@@ -16,17 +12,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-MAX_JOB_CREATE_ATTEMPTS = 5
-MAX_TRIALS = 5
-
 HTTP_PORT = 8888
-
-MAX_N_OF_WORKERS = 10
-
-POLLING_INTERVAL = 1  # second
-TEMPLATE_ID_KEY = "input_0"
-N_OF_WORKERS_KEY = "input_1"
-INPUT_PARAMETERS_KEY = "input_2"
 
 
 def main():
@@ -44,7 +30,8 @@ def main():
             )
 
     maprunner = parallelrunner.ParallelRunner(
-        input_path, output_path, polling_interval=POLLING_INTERVAL
+        input_path,
+        output_path,
     )
 
     try:
@@ -60,36 +47,6 @@ def main():
             httpd.shutdown()
     except Exception as err:  # pylint: disable=broad-except
         logger.error(f"{err} . Stopping %s", exc_info=True)
-
-
-@contextlib.contextmanager
-def create_study_job(template_id, job_inputs, studies_api):
-    n_of_create_attempts = 0
-    while True:
-        try:
-            n_of_create_attempts += 1
-            job = studies_api.create_study_job(
-                study_id=template_id,
-                job_inputs=job_inputs,
-            )
-            break
-        except osparc_client.exceptions.ApiException as api_exception:
-            if n_of_create_attempts >= MAX_JOB_CREATE_ATTEMPTS:
-                raise Exception(
-                    f"Tried {n_of_create_attempts} times to create a job from "
-                    "the study, but failed"
-                )
-            else:
-                logger.exception(api_exception)
-                logger.info(
-                    "Received an API Exception from server "
-                    "when creating job, retrying..."
-                )
-
-    try:
-        yield job
-    finally:
-        studies_api.delete_study_job(template_id, job.id)
 
 
 if __name__ == "__main__":

@@ -20,14 +20,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+POLLING_INTERVAL = 1  # second
+
 MAX_JOB_CREATE_ATTEMPTS = 5
 MAX_TRIALS = 5
-
-HTTP_PORT = 8888
-
 MAX_N_OF_WORKERS = 10
 
-POLLING_INTERVAL = 1  # second
 TEMPLATE_ID_KEY = "input_0"
 N_OF_WORKERS_KEY = "input_1"
 INPUT_PARAMETERS_KEY = "input_2"
@@ -35,11 +33,21 @@ INPUT_PARAMETERS_KEY = "input_2"
 
 class ParallelRunner:
     def __init__(
-        self, input_path, output_path, polling_interval=1, batch_mode=False
+        self,
+        input_path,
+        output_path,
+        batch_mode=False,
+        polling_interval=POLLING_INTERVAL,
+        max_n_of_workers=MAX_N_OF_WORKERS,
+        max_trials=MAX_TRIALS,
+        max_job_create_attempts=MAX_JOB_CREATE_ATTEMPTS,
     ):
         """Constructor"""
 
         self.batch_mode = batch_mode
+        self.max_n_of_workers = max_n_of_workers
+        self.max_trials = max_trials
+        self.max_job_create_attempts = max_job_create_attempts
 
         self.input_path = input_path  # path where osparc write all our input
         self.output_path = output_path  # path where osparc write all our input
@@ -127,13 +135,13 @@ class ParallelRunner:
         n_of_workers = key_values[N_OF_WORKERS_KEY]["value"]
         if n_of_workers is None:
             raise ValueError("Number of workers can't be None")
-        elif n_of_workers > MAX_N_OF_WORKERS:
+        elif n_of_workers > self.max_n_of_workers:
             logger.warning(
                 "Attempt to set number of workers to more than "
-                f"is allowed ({MAX_N_OF_WORKERS}), limiting value "
+                f"is allowed ({self.max_n_of_workers}), limiting value "
                 "to maximum amount"
             )
-            n_of_workers = MAX_N_OF_WORKERS
+            n_of_workers = self.max_n_of_workers
 
         last_tasks_uuid = ""
         waiter_wrong_uuid = 0
@@ -381,7 +389,7 @@ class ParallelRunner:
                     f"{self.n_of_finished_batches} of {len(input_batches)}"
                 )
             except Exception as error:
-                if trial_number >= MAX_TRIALS:
+                if trial_number >= self.max_trials:
                     logger.info(
                         f"Batch {batch} failed with error {error} in "
                         f"trial {trial_number}, not retrying, raising error"
@@ -437,7 +445,7 @@ def create_study_job(template_id, job_inputs, studies_api):
             )
             break
         except osparc_client.exceptions.ApiException as api_exception:
-            if n_of_create_attempts >= MAX_JOB_CREATE_ATTEMPTS:
+            if n_of_create_attempts >= self.max_job_create_attempts:
                 raise Exception(
                     f"Tried {n_of_create_attempts} times to create a job from "
                     "the study, but failed"
