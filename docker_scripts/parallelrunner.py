@@ -20,7 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-POLLING_INTERVAL = 1  # second
+FILE_POLLING_INTERVAL = 1  # second
 
 MAX_JOB_CREATE_ATTEMPTS = 5
 MAX_TRIALS = 5
@@ -37,7 +37,7 @@ class ParallelRunner:
         input_path,
         output_path,
         batch_mode=False,
-        polling_interval=POLLING_INTERVAL,
+        file_polling_interval=FILE_POLLING_INTERVAL,
         max_n_of_workers=MAX_N_OF_WORKERS,
         max_trials=MAX_TRIALS,
         max_job_create_attempts=MAX_JOB_CREATE_ATTEMPTS,
@@ -64,7 +64,7 @@ class ParallelRunner:
         if self.output_tasks_path.exists():
             self.output_tasks_path.unlink()
 
-        self.polling_interval = polling_interval
+        self.file_polling_interval = file_polling_interval
         self.caller_uuid = None
         self.uuid = str(uuid.uuid4())
 
@@ -102,7 +102,7 @@ class ParallelRunner:
         while not self.key_values_path.exists():
             if waiter % 10 == 0:
                 logger.info("Waiting for key_values.json to exist ...")
-            time.sleep(self.polling_interval)
+            time.sleep(self.file_polling_interval)
             waiter += 1
 
         key_values = json.loads(self.key_values_path.read_text())
@@ -125,7 +125,7 @@ class ParallelRunner:
                     f"exist in key_values, current content: {key_values}..."
                 )
             key_values = json.loads(self.key_values_path.read_text())
-            time.sleep(self.polling_interval)
+            time.sleep(self.file_polling_interval)
             waiter += 1
 
         self.template_id = key_values[TEMPLATE_ID_KEY]["value"]
@@ -153,7 +153,7 @@ class ParallelRunner:
                         f"Waiting for input file at {self.input_tasks_path}..."
                     )
                     self.handshaker.retry_last_write()
-                time.sleep(self.polling_interval)
+                time.sleep(self.file_polling_interval)
                 waiter_input_exists += 1
 
             input_dict = json.loads(self.input_tasks_path.read_text())
@@ -166,7 +166,7 @@ class ParallelRunner:
                         "Received command with wrong caller uuid: "
                         f"{caller_uuid} or map uuid: {map_uuid}"
                     )
-                time.sleep(self.polling_interval)
+                time.sleep(self.file_polling_interval)
                 waiter_wrong_uuid += 1
                 continue
 
@@ -178,7 +178,7 @@ class ParallelRunner:
                 if tasks_uuid == last_tasks_uuid:
                     if waiter_wrong_uuid % 10 == 0:
                         logger.info("Waiting for new tasks uuid")
-                    time.sleep(self.polling_interval)
+                    time.sleep(self.file_polling_interval)
                     waiter_wrong_uuid += 1
                 else:
                     input_tasks = input_dict["tasks"]
@@ -210,7 +210,7 @@ class ParallelRunner:
             else:
                 raise ValueError("Command unknown: {command}")
 
-            time.sleep(self.polling_interval)
+            time.sleep(self.file_polling_interval)
 
     def batch_input_tasks(self, input_tasks, n_of_batches):
         batches = [[] for _ in range(n_of_batches)]
@@ -290,7 +290,7 @@ class ParallelRunner:
 
             return job_inputs, "SUCCESS"
 
-        with create_study_job(
+        with self.create_study_job(
             self.template_id, job_inputs, self.studies_api
         ) as job:
             job_status = self.studies_api.start_study_job(
@@ -432,32 +432,31 @@ class ParallelRunner:
 
         return keyvalues
 
+    @contextlib.contextmanager
+    def create_study_job(self, template_id, job_inputs, studies_api):
+        n_of_create_attempts = 0
+        while True:
+            try:
+                n_of_create_attempts += 1
+                job = studies_api.create_study_job(
+                    study_id=template_id,
+                    job_inputs=job_inputs,
+                )
+                break
+            except osparc_client.exceptions.ApiException as api_exception:
+                if n_of_create_attempts >= self.max_job_create_attempts:
+                    raise Exception(
+                        f"Tried {n_of_create_attempts} times to create a job from "
+                        "the study, but failed"
+                    )
+                else:
+                    logger.exception(api_exception)
+                    logger.info(
+                        "Received an API Exception from server "
+                        "when creating job, retrying..."
+                    )
 
-@contextlib.contextmanager
-def create_study_job(template_id, job_inputs, studies_api):
-    n_of_create_attempts = 0
-    while True:
         try:
-            n_of_create_attempts += 1
-            job = studies_api.create_study_job(
-                study_id=template_id,
-                job_inputs=job_inputs,
-            )
-            break
-        except osparc_client.exceptions.ApiException as api_exception:
-            if n_of_create_attempts >= self.max_job_create_attempts:
-                raise Exception(
-                    f"Tried {n_of_create_attempts} times to create a job from "
-                    "the study, but failed"
-                )
-            else:
-                logger.exception(api_exception)
-                logger.info(
-                    "Received an API Exception from server "
-                    "when creating job, retrying..."
-                )
-
-    try:
-        yield job
-    finally:
-        studies_api.delete_study_job(template_id, job.id)
+            yield job
+        finally:
+            studies_api.delete_study_job(template_id, job.id)

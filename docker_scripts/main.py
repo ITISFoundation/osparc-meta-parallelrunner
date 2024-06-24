@@ -3,6 +3,7 @@ import logging
 import pathlib as pl
 import socketserver
 import threading
+import time
 
 import pydantic as pyda
 import pydantic_settings
@@ -15,13 +16,23 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 HTTP_PORT = 8888
+INPUT_CONF_KEY = "input_3"
 
 
 def main():
     """Main"""
 
     settings = MainSettings()
-    settings = settings.parse_file(settings.input_path / "parallelrunner.json")
+    config_path = settings.input_path / INPUT_CONF_KEY / "parallelrunner.json"
+
+    waiter = 0
+    while not config_path.exists():
+        if waiter % 10 == 0:
+            logger.info("Waiting for parallelrunner.json to exist ...")
+        time.sleep(settings.file_polling_interval)
+        waiter += 1
+
+    settings = settings.parse_file(config_path)
     logging.info(f"Received the following settings: {settings}")
 
     http_dir_path = pl.Path(__file__).parent / "http"
@@ -51,6 +62,7 @@ def main():
 
 class MainSettings(pydantic_settings.BaseSettings):
     batch_mode: bool = False
+    file_polling_interval: int = 1
     input_path: pyda.DirectoryPath = pyda.Field(alias="DY_SIDECAR_PATH_INPUTS")
     output_path: pl.Path = pyda.Field(alias="DY_SIDECAR_PATH_OUTPUTS")
 
