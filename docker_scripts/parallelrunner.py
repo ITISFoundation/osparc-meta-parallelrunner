@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 FILE_POLLING_INTERVAL = 1  # second
 
 MAX_JOB_CREATE_ATTEMPTS = 5
+JOB_CREATE_ATTEMPTS_DELAY = 5
 MAX_TRIALS = 5
 MAX_N_OF_WORKERS = 10
 
@@ -388,16 +389,22 @@ class ParallelRunner:
                     "Worker has finished batch "
                     f"{self.n_of_finished_batches} of {len(input_batches)}"
                 )
+            except ParallelRunner.FatalException as error:
+                logger.info(
+                    f"Batch {batch} failed with fatal error ({error}) in "
+                    f"trial {trial_number}, not retrying, raising error"
+                )
+                raise error
             except Exception as error:
                 if trial_number >= self.max_trials:
                     logger.info(
-                        f"Batch {batch} failed with error {error} in "
+                        f"Batch {batch} failed with error ({error}) in "
                         f"trial {trial_number}, not retrying, raising error"
                     )
                     raise error
                 else:
                     logger.info(
-                        f"Batch {batch} failed with error {error} in "
+                        f"Batch {batch} failed with error ({error}) in "
                         f"trial {trial_number}, retrying "
                     )
                     batch = map_func(batch, trial_number=trial_number + 1)
@@ -449,14 +456,22 @@ class ParallelRunner:
                         f"Tried {n_of_create_attempts} times to create a job from "
                         "the study, but failed"
                     )
+                elif api_exception.reason.upper() == "NOT FOUND":
+                    raise ParallelRunner.FatalException(
+                        f"Study template not found: {template_id}"
+                    )
                 else:
                     logger.exception(api_exception)
                     logger.info(
-                        "Received an API Exception from server "
+                        "Received an unhandled API Exception from server "
                         "when creating job, retrying..."
                     )
+                time.sleep(JOB_CREATE_ATTEMPTS_DELAY)
 
         try:
             yield job
         finally:
             studies_api.delete_study_job(template_id, job.id)
+
+    class FatalException(Exception):
+        pass

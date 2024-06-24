@@ -4,6 +4,7 @@ import pathlib as pl
 import socketserver
 import threading
 import time
+import typing
 
 import pydantic as pyda
 import pydantic_settings
@@ -64,7 +65,9 @@ class MainSettings(pydantic_settings.BaseSettings):
     batch_mode: bool = False
     file_polling_interval: int = 1
     input_path: pyda.DirectoryPath = pyda.Field(alias="DY_SIDECAR_PATH_INPUTS")
-    output_path: pl.Path = pyda.Field(alias="DY_SIDECAR_PATH_OUTPUTS")
+    output_path: pyda.DirectoryPath = pyda.Field(
+        alias="DY_SIDECAR_PATH_OUTPUTS"
+    )
 
 
 if __name__ == "__main__":
