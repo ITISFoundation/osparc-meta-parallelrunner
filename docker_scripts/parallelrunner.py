@@ -349,7 +349,7 @@ class ParallelRunner:
                     probe_output = probe_outputs[task_i]
                 else:
                     assert len(batch) == 1
-                    probe_output = probe_output
+                    probe_output = probe_outputs
 
                 if probe_name not in output:
                     raise ValueError(f"Unknown probe in output: {probe_name}")
