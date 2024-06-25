@@ -345,7 +345,12 @@ class ParallelRunner:
         for task_i, task in enumerate(batch):
             output = task["output"]
             for probe_name, probe_outputs in results.items():
-                probe_output = probe_outputs[task_i]
+                if self.batch_mode:
+                    probe_output = probe_outputs[task_i]
+                else:
+                    assert len(batch) == 1
+                    probe_output = probe_output
+
                 if probe_name not in output:
                     raise ValueError(f"Unknown probe in output: {probe_name}")
                 probe_type = output[probe_name]["type"]
