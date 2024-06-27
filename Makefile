@@ -37,6 +37,7 @@ clean:
 
 .PHONY: build
 build: clean compose-spec	## build docker image
+	chmod -R 755 docker_scripts
 	docker compose build
 
 validation-clean:
