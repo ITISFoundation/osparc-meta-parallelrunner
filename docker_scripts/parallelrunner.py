@@ -240,66 +240,56 @@ class ParallelRunner:
             output_tasks.append(batches[batch_id].pop(0))
         return output_tasks
 
-    def create_job_inputs(self, batch):
+    def create_job_inputs(self, input):
         """Create job inputs"""
 
         job_inputs = {"values": {}}
 
-        for task in batch:
-            input = task["input"]
-            for param_name, param_input in input.items():
-                param_type = param_input["type"]
-                param_value = param_input["value"]
-                if param_type == "FileJSON":
-                    param_filename = param_input["filename"]
-                    tmp_dir = tempfile.TemporaryDirectory()
-                    tmp_dir_path = pl.Path(tmp_dir.name)
-                    tmp_input_file_path = tmp_dir_path / param_filename
-                    tmp_input_file_path.write_text(json.dumps(param_value))
+        for param_name, param_input in input.items():
+            param_type = param_input["type"]
+            param_value = param_input["value"]
+            if param_type == "FileJSON":
+                param_filename = param_input["filename"]
+                tmp_dir = tempfile.TemporaryDirectory()
+                tmp_dir_path = pl.Path(tmp_dir.name)
+                tmp_input_file_path = tmp_dir_path / param_filename
+                tmp_input_file_path.write_text(json.dumps(param_value))
 
-                    if self.test_mode:
-                        processed_param_value = None
-                    else:
-                        input_data_file = osparc.FilesApi(
-                            self.api_client
-                        ).upload_file(file=tmp_input_file_path)
-                        processed_param_value = input_data_file
-                elif param_type == "file":
-                    file_info = json.loads(param_value)
-                    if self.test_mode:
-                        processed_param_value = None
-                    else:
-                        input_data_file = osparc_client.models.file.File(
-                            id=file_info["id"],
-                            filename=file_info["filename"],
-                            content_type=file_info["content_type"],
-                            checksum=file_info["checksum"],
-                            e_tag=file_info["e_tag"],
-                        )
-                        processed_param_value = input_data_file
-                elif param_type == "integer":
-                    processed_param_value = int(param_value)
-                elif param_type == "float":
-                    processed_param_value = float(param_value)
+                if self.test_mode:
+                    processed_param_value = f"File json: {param_value}"
                 else:
-                    processed_param_value = param_value
-
-                if self.batch_mode:
-                    if param_name not in job_inputs:
-                        job_inputs["values"][param_name] = []
-                    job_inputs["values"][param_name].append(
-                        processed_param_value
+                    input_data_file = osparc.FilesApi(
+                        self.api_client
+                    ).upload_file(file=tmp_input_file_path)
+                    processed_param_value = input_data_file
+            elif param_type == "file":
+                file_info = json.loads(param_value)
+                if self.test_mode:
+                    processed_param_value = None
+                else:
+                    input_data_file = osparc_client.models.file.File(
+                        id=file_info["id"],
+                        filename=file_info["filename"],
+                        content_type=file_info["content_type"],
+                        checksum=file_info["checksum"],
+                        e_tag=file_info["e_tag"],
                     )
-                else:
-                    assert len(batch) == 1
-                    job_inputs["values"][param_name] = processed_param_value
+                    processed_param_value = input_data_file
+            elif param_type == "integer":
+                processed_param_value = int(param_value)
+            elif param_type == "float":
+                processed_param_value = float(param_value)
+            else:
+                processed_param_value = param_value
+
+            job_inputs["values"][param_name] = processed_param_value
 
         return job_inputs
 
     def run_job(self, job_inputs):
         """Run a job with given inputs"""
 
-        logger.debug(f"Sending inputs: {job_inputs}")
+        logger.info(f"Sending inputs: {job_inputs}")
 
         if self.test_mode:
             logger.info("Map in test mode, just returning input")
@@ -345,10 +335,19 @@ class ParallelRunner:
         for task_i, task in enumerate(batch):
             output = task["output"]
             for probe_name, probe_outputs in results.items():
-                probe_output = probe_outputs[task_i]
                 if probe_name not in output:
                     raise ValueError(f"Unknown probe in output: {probe_name}")
                 probe_type = output[probe_name]["type"]
+
+                if self.batch_mode and probe_type == "FileJSON":
+                    probe_output = probe_outputs[task_i]
+                else:
+                    if self.batch_mode:
+                        raise ParallelRunner.FatalException(
+                            "Only FileJSON output allowed in batch mode, "
+                            f"received {probe_type} for {probe_name} output"
+                        )
+                    probe_output = probe_outputs
 
                 if probe_type == "FileJSON":
                     output_file = pl.Path(
@@ -384,6 +383,37 @@ class ParallelRunner:
                 else:
                     output[probe_name]["value"] = probe_output
 
+    def transform_batch_to_task_input(self, batch):
+        task_input = {}
+        for task in batch:
+            input = task["input"]
+            for param_name, param_input in input.items():
+                param_type = param_input["type"]
+
+                if param_type == "FileJSON" and self.batch_mode:
+                    param_filename = param_input["filename"]
+                    param_value = param_input["value"]
+
+                    if param_name not in task_input:
+                        task_input[param_name] = {}
+                        task_input[param_name]["value"] = []
+                    task_input[param_name]["value"].append(param_value)
+
+                    task_input[param_name]["type"] = param_type
+                    task_input[param_name]["type"] = param_type
+                    task_input[param_name]["filename"] = param_filename
+                else:
+                    if param_name in task_input:
+                        raise ParallelRunner.FatalException(
+                            "Can only handle multiple value of FileJSON in "
+                            "one batch, received several "
+                            f"{param_type} for {param_name}"
+                        )
+                    else:
+                        task_input[param_name] = param_input
+
+        return task_input
+
     def run_batches(self, tasks_uuid, input_batches, n_of_workers):
         """Run the tasks"""
 
@@ -395,7 +425,9 @@ class ParallelRunner:
             try:
                 logger.info(f"Running worker for batch: {batch}")
 
-                job_inputs = self.create_job_inputs(batch)
+                task_input = self.transform_batch_to_task_input(batch)
+
+                job_inputs = self.create_job_inputs(task_input)
 
                 job_outputs, status = self.run_job(job_inputs)
 
