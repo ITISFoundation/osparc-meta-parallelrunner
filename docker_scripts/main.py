@@ -26,16 +26,6 @@ def main():
     settings = MainSettings()
     config_path = settings.input_path / INPUT_CONF_KEY / "parallelrunner.json"
 
-    waiter = 0
-    while not config_path.exists():
-        if waiter % 10 == 0:
-            logger.info("Waiting for parallelrunner.json to exist ...")
-        time.sleep(settings.file_polling_interval)
-        waiter += 1
-
-    settings = settings.parse_file(config_path)
-    logging.info(f"Received the following settings: {settings}")
-
     http_dir_path = pl.Path(__file__).parent / "http"
 
     class HTTPHandler(http.server.SimpleHTTPRequestHandler):
@@ -44,18 +34,32 @@ def main():
                 *args, **kwargs, directory=http_dir_path.resolve()
             )
 
-    maprunner = parallelrunner.ParallelRunner(**settings.dict())
-
     try:
         logger.info(
             f"Starting http server at port {HTTP_PORT} and serving path {http_dir_path}"
         )
         with socketserver.TCPServer(("", HTTP_PORT), HTTPHandler) as httpd:
+            # First start the empty web server
             httpd_thread = threading.Thread(target=httpd.serve_forever)
             httpd_thread.start()
+
+            # Now start the real parallel runner
+            waiter = 0
+            while not config_path.exists():
+                if waiter % 10 == 0:
+                    logger.info("Waiting for parallelrunner.json to exist ...")
+                time.sleep(settings.file_polling_interval)
+                waiter += 1
+
+            settings = settings.parse_file(config_path)
+            logging.info(f"Received the following settings: {settings}")
+
+            maprunner = parallelrunner.ParallelRunner(**settings.dict())
+
             maprunner.setup()
             maprunner.start()
             maprunner.teardown()
+
             httpd.shutdown()
     except Exception as err:  # pylint: disable=broad-except
         logger.error(f"{err} . Stopping %s", exc_info=True)
