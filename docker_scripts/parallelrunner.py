@@ -326,7 +326,7 @@ class ParallelRunner:
 
         return job_outputs, status
 
-    def process_job_outputs(self, results, batch):
+    def process_job_outputs(self, results, batch, status):
         if self.template_id == "TEST_UUID":
             logger.info("Map in test mode, just returning input")
 
@@ -334,6 +334,7 @@ class ParallelRunner:
 
         for task_i, task in enumerate(batch):
             output = task["output"]
+            task["status"] = status
             for probe_name, probe_outputs in results.items():
                 if probe_name not in output:
                     raise ValueError(f"Unknown probe in output: {probe_name}")
@@ -433,7 +434,7 @@ class ParallelRunner:
 
                 job_outputs, status = self.run_job(job_inputs)
 
-                batch = self.process_job_outputs(job_outputs, batch)
+                batch = self.process_job_outputs(job_outputs, batch, status)
 
                 logger.info(
                     "Worker has finished batch "
