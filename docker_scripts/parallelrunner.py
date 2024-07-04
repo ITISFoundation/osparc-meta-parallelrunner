@@ -383,6 +383,8 @@ class ParallelRunner:
                 else:
                     output[probe_name]["value"] = probe_output
 
+        return batch
+
     def transform_batch_to_task_input(self, batch):
         task_input = {}
         for task in batch:
