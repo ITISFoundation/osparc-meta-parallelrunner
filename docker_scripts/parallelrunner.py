@@ -289,7 +289,7 @@ class ParallelRunner:
     def run_job(self, job_inputs):
         """Run a job with given inputs"""
 
-        logger.info(f"Sending inputs: {job_inputs}")
+        logger.debug(f"Sending inputs: {job_inputs}")
 
         if self.test_mode:
             logger.info("Map in test mode, just returning input")
