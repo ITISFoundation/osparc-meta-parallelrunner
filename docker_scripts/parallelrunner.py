@@ -335,20 +335,10 @@ class ParallelRunner:
         for task_i, task in enumerate(batch):
             output = task["output"]
             task["status"] = status
-            for probe_name, probe_outputs in results.items():
+            for probe_name, probe_output in results.items():
                 if probe_name not in output:
                     raise ValueError(f"Unknown probe in output: {probe_name}")
                 probe_type = output[probe_name]["type"]
-
-                if self.batch_mode and probe_type == "FileJSON":
-                    probe_output = probe_outputs[task_i]
-                else:
-                    if self.batch_mode:
-                        raise ParallelRunner.FatalException(
-                            "Only FileJSON output allowed in batch mode, "
-                            f"received {probe_type} for {probe_name} output"
-                        )
-                    probe_output = probe_outputs
 
                 if probe_type == "FileJSON":
                     output_file = pl.Path(
@@ -383,6 +373,17 @@ class ParallelRunner:
                     output[probe_name]["value"] = float(probe_output)
                 else:
                     output[probe_name]["value"] = probe_output
+
+                if self.batch_mode and probe_type == "FileJSON":
+                    output[probe_name]["value"] = output[probe_name]["value"][
+                        task_i
+                    ]
+                else:
+                    if self.batch_mode:
+                        raise ParallelRunner.FatalException(
+                            "Only FileJSON output allowed in batch mode, "
+                            f"received {probe_type} for {probe_name} output"
+                        )
 
         return batch
 
