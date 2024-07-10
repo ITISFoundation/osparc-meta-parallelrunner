@@ -293,7 +293,6 @@ class ParallelRunner:
 
         if self.test_mode:
             logger.info("Map in test mode, just returning input")
-            self.n_of_finished_batches += 1
 
             return job_inputs, "SUCCESS"
 
@@ -321,8 +320,6 @@ class ParallelRunner:
                 job_outputs = self.studies_api.get_study_job_outputs(
                     study_id=self.template_id, job_id=job.id
                 ).results
-
-                self.n_of_finished_batches += 1
 
         return job_outputs, status
 
@@ -437,6 +434,7 @@ class ParallelRunner:
 
                 batch = self.process_job_outputs(job_outputs, batch, status)
 
+                self.n_of_finished_batches += 1
                 logger.info(
                     "Worker has finished batch "
                     f"{self.n_of_finished_batches} of {len(input_batches)}"
