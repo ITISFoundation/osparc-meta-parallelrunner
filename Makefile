@@ -74,7 +74,6 @@ publish-master: ## push to local throw away registry to test integration
 publish-staging: ## push to local throw away registry to test integration
 	docker tag simcore/services/dynamic/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} $(STAGING_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 	docker push $(STAGING_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
-	@curl $(STAGING_REGISTRY)/v2/_catalog | jq
 
 .PHONY: publish-master-aws
 publish-master-aws: ## push to local throw away registry to test integration

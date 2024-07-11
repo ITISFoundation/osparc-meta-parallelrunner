@@ -288,7 +288,7 @@ class ParallelRunner:
 
         return job_inputs
 
-    def run_job(self, job_inputs):
+    def run_job(self, job_inputs, input_batch):
         """Run a job with given inputs"""
 
         logger.debug(f"Sending inputs: {job_inputs}")
@@ -296,7 +296,11 @@ class ParallelRunner:
         if self.test_mode:
             logger.info("Map in test mode, just returning input")
 
-            return job_inputs, "SUCCESS"
+            done_batch = self.process_job_outputs(
+                job_inputs, input_batch, "SUCCESS"
+            )
+
+            return done_batch
 
         with self.create_study_job(
             self.template_id, job_inputs, self.studies_api
@@ -313,8 +317,6 @@ class ParallelRunner:
                 )
                 time.sleep(1)
 
-            status = job_status.state
-
             if job_status.state == "FAILED":
                 logger.error(f"Batch failed: {job_inputs}")
                 raise Exception("Job returned a failed status")
@@ -323,7 +325,11 @@ class ParallelRunner:
                     study_id=self.template_id, job_id=job.id
                 ).results
 
-        return job_outputs, status
+            done_batch = self.process_job_outputs(
+                job_outputs, input_batch, job_status.state
+            )
+
+        return done_batch
 
     def process_job_outputs(self, results, batch, status):
         if self.template_id == "TEST_UUID":
@@ -432,9 +438,7 @@ class ParallelRunner:
 
                 job_inputs = self.create_job_inputs(task_input)
 
-                job_outputs, status = self.run_job(job_inputs)
-
-                batch = self.process_job_outputs(job_outputs, batch, status)
+                output_batch = self.run_job(job_inputs, batch)
 
                 self.n_of_finished_batches += 1
                 logger.info(
@@ -451,7 +455,8 @@ class ParallelRunner:
                 if trial_number >= self.max_trials:
                     logger.info(
                         f"Batch {batch} failed with error ({error}) in "
-                        f"trial {trial_number}, not retrying, raising error"
+                        f"trial {trial_number}, reach max number of trials of "
+                        f"{self.max_trials}, not retrying, raising error"
                     )
                     raise error
                 else:
@@ -459,9 +464,11 @@ class ParallelRunner:
                         f"Batch {batch} failed with error ({error}) in "
                         f"trial {trial_number}, retrying "
                     )
-                    batch = map_func(batch, trial_number=trial_number + 1)
+                    output_batch = map_func(
+                        batch, trial_number=trial_number + 1
+                    )
 
-            return batch
+            return output_batch
 
         logger.info(
             f"Starting {len(input_batches)} batches on {n_of_workers} workers"
