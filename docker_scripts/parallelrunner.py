@@ -434,7 +434,7 @@ class ParallelRunner:
         def map_func(batch, trial_number=1):
             try:
                 logger.info(
-                    "Running worker for a batch of " f"{len(batch)} jobs"
+                    "Running worker for a batch of " f"{len(batch)} tasks"
                 )
                 logger.debug(f"Running worker for batch: {batch}")
 
