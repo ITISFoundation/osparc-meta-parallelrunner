@@ -432,7 +432,10 @@ class ParallelRunner:
 
         def map_func(batch, trial_number=1):
             try:
-                logger.info(f"Running worker for batch: {batch}")
+                logger.info(
+                    "Running worker for a batch of " f"{len(batch)} jobs"
+                )
+                logger.debug(f"Running worker for batch: {batch}")
 
                 task_input = self.transform_batch_to_task_input(batch)
 
