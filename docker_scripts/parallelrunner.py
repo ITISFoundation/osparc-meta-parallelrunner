@@ -426,7 +426,8 @@ class ParallelRunner:
     def run_batches(self, tasks_uuid, input_batches, n_of_workers):
         """Run the tasks"""
 
-        logger.info(f"Evaluating: {input_batches}")
+        logger.info(f"Evaluating {len(input_batches)} batches")
+        logger.debug(f"Evaluating: {input_batches}")
 
         self.n_of_finished_batches = 0
 
