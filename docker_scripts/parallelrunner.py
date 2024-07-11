@@ -89,6 +89,8 @@ class ParallelRunner:
             host=os.environ["OSPARC_API_HOST"],
             username=os.environ["OSPARC_API_KEY"],
             password=os.environ["OSPARC_API_SECRET"],
+            retry_status_codes={429, 502, 503, 504, 404, 506},
+            retry_max_count=5,
         )
         if self.test_mode:
             self.api_client = None
