@@ -215,7 +215,8 @@ class ParallelRunner:
                         {"uuid": tasks_uuid, "tasks": output_tasks}
                     )
                     self.output_tasks_path.write_text(output_tasks_content)
-                    logger.info(
+                    logger.info(f"Finished a set of {len(output_tasks)} tasks")
+                    logger.debug(
                         f"Finished a set of tasks: {output_tasks_content}"
                     )
                     last_tasks_uuid = tasks_uuid
