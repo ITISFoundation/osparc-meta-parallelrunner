@@ -310,17 +310,19 @@ class ParallelRunner:
                 study_id=self.template_id, job_id=job.id
             )
 
-            while (
-                job_status.state != "SUCCESS" and job_status.state != "FAILED"
-            ):
+            while job_status.stopped_at is None:
                 job_status = self.studies_api.inspect_study_job(
                     study_id=self.template_id, job_id=job.id
                 )
                 time.sleep(1)
 
-            if job_status.state == "FAILED":
-                logger.error(f"Batch failed: {job_inputs}")
-                raise Exception("Job returned a failed status")
+            if job_status.state != "SUCCESS":
+                logger.error(
+                    f"Batch failed with {job_status.state}: " f"{job_inputs}"
+                )
+                raise Exception(
+                    f"Job returned a failed status: {job_status.state}"
+                )
             else:
                 job_outputs = self.studies_api.get_study_job_outputs(
                     study_id=self.template_id, job_id=job.id
