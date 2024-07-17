@@ -25,6 +25,7 @@ version-patch version-minor version-major: .bumpversion.cfg ## increases service
 	@make compose-spec
 	@$(call _bumpversion,$<,version-)
 	@make compose-spec
+	@git commit -a -m "Bump version"
 
 .PHONY: compose-spec
 compose-spec: ## runs ooil to assemble the docker-compose.yml file
