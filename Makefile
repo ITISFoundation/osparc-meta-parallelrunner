@@ -54,10 +54,12 @@ validation_client_run: validation-clean
 docker_compose: validation-clean
 	docker compose down
 	docker compose --file docker-compose-local.yml up
-	
-.PHONY: run-local
-run-local: build validation_client_run docker_compose	## runs image with local configuration
 
+run-local-parallel: docker_compose validation_client_run
+
+.PHONY: run-local
+run-local: build
+	@make run-local-parallel
 
 .PHONY: publish-local
 publish-local: run-local ## push to local throw away registry to test integration
