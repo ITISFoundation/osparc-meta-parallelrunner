@@ -55,23 +55,23 @@ docker_compose: validation-clean
 	docker compose --file docker-compose-local.yml up
 	
 .PHONY: run-local
-run-local: validation_client_run docker_compose	## runs image with local configuration
+run-local: build validation_client_run docker_compose	## runs image with local configuration
 
 
 .PHONY: publish-local
-publish-local: ## push to local throw away registry to test integration
+publish-local: run-local ## push to local throw away registry to test integration
 	docker tag simcore/services/dynamic/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} $(LOCAL_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 	docker push $(LOCAL_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 	@curl $(LOCAL_REGISTRY)/v2/_catalog | jq
 
 .PHONY: publish-master
-publish-master: ## push to local throw away registry to test integration
+publish-master: run-local ## push to local throw away registry to test integration
 	docker tag simcore/services/dynamic/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} $(MASTER_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 	docker push $(MASTER_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 	@curl $(MASTER_REGISTRY)/v2/_catalog | jq
 
 .PHONY: publish-staging
-publish-staging: ## push to local throw away registry to test integration
+publish-staging: run-local ## push to local throw away registry to test integration
 	docker tag simcore/services/dynamic/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} $(STAGING_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 	docker push $(STAGING_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 
