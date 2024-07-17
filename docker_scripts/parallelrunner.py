@@ -20,11 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-FILE_POLLING_INTERVAL = 1  # second
 
-MAX_JOB_CREATE_ATTEMPTS = 5
-JOB_CREATE_ATTEMPTS_DELAY = 5
-MAX_TRIALS = 5
 MAX_N_OF_WORKERS = 10
 
 TEMPLATE_ID_KEY = "input_0"
@@ -37,19 +33,21 @@ class ParallelRunner:
         self,
         input_path,
         output_path,
-        batch_mode=False,
-        file_polling_interval=FILE_POLLING_INTERVAL,
         max_n_of_workers=MAX_N_OF_WORKERS,
-        max_trials=MAX_TRIALS,
-        max_job_create_attempts=MAX_JOB_CREATE_ATTEMPTS,
+        batch_mode=False,
+        file_polling_interval=None,
+        max_job_trials=None,
+        max_job_create_attempts=None,
+        job_create_attempts_delay=None,
     ):
         """Constructor"""
         self.test_mode = False
 
         self.batch_mode = batch_mode
         self.max_n_of_workers = max_n_of_workers
-        self.max_trials = max_trials
+        self.max_job_trials = max_job_trials
         self.max_job_create_attempts = max_job_create_attempts
+        self.job_create_attempts_delay = job_create_attempts_delay
 
         self.input_path = input_path  # path where osparc write all our input
         self.output_path = output_path  # path where osparc write all our input
@@ -459,11 +457,11 @@ class ParallelRunner:
                 )
                 raise error
             except Exception as error:
-                if trial_number >= self.max_trials:
+                if trial_number >= self.max_job_trials:
                     logger.info(
                         f"Batch {batch} failed with error ({error}) in "
                         f"trial {trial_number}, reach max number of trials of "
-                        f"{self.max_trials}, not retrying, raising error"
+                        f"{self.max_job_trials}, not retrying, raising error"
                     )
                     raise error
                 else:
@@ -533,7 +531,7 @@ class ParallelRunner:
                         "Received an unhandled API Exception from server "
                         "when creating job, retrying..."
                     )
-                time.sleep(JOB_CREATE_ATTEMPTS_DELAY)
+                time.sleep(self.job_create_attempts_delay)
 
         try:
             yield job

@@ -19,6 +19,12 @@ logger = logging.getLogger(__name__)
 HTTP_PORT = 8888
 INPUT_CONF_KEY = "input_3"
 
+FILE_POLLING_INTERVAL = 1  # second
+
+MAX_JOB_CREATE_ATTEMPTS = 5
+JOB_CREATE_ATTEMPTS_DELAY = 5
+MAX_JOB_TRIALS = 5
+
 
 def main():
     """Main"""
@@ -67,11 +73,15 @@ def main():
 
 class MainSettings(pydantic_settings.BaseSettings):
     batch_mode: bool = False
-    file_polling_interval: int = 1
+    file_polling_interval: int = FILE_POLLING_INTERVAL
     input_path: pyda.DirectoryPath = pyda.Field(alias="DY_SIDECAR_PATH_INPUTS")
     output_path: pyda.DirectoryPath = pyda.Field(
         alias="DY_SIDECAR_PATH_OUTPUTS"
     )
+    max_job_trials: int = MAX_JOB_TRIALS
+    file_polling_interval: int = FILE_POLLING_INTERVAL
+    max_job_create_attempts: int = MAX_JOB_CREATE_ATTEMPTS
+    job_create_attempts_delay: int = JOB_CREATE_ATTEMPTS_DELAY
 
 
 if __name__ == "__main__":

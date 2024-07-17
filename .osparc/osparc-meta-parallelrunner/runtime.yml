@@ -20,7 +20,6 @@ paths-mapping:
     - /home/osparcuser/work/workspace
 
 compose-spec:
-  version: "3.7"
   services:
     osparc-meta-parallelrunner:
       image: $${SIMCORE_REGISTRY}/simcore/services/dynamic/osparc-meta-parallelrunner:$${SERVICE_VERSION}
