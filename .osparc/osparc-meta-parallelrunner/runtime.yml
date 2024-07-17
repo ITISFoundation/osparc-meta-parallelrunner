@@ -21,6 +21,7 @@ paths-mapping:
 
 compose-spec:
   services:
+    version: "3.7"
     osparc-meta-parallelrunner:
       image: $${SIMCORE_REGISTRY}/simcore/services/dynamic/osparc-meta-parallelrunner:$${SERVICE_VERSION}
       environment:
