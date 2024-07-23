@@ -43,7 +43,7 @@ build: clean compose-spec	## build docker image
 	docker compose build
 
 validation-clean:
-	sudo rm -rf validation-tmp
+	rm -rf validation-tmp
 	cp -r validation validation-tmp
 	chmod -R 770 validation-tmp
 
