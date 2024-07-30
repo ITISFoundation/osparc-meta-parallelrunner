@@ -26,6 +26,8 @@ MAX_JOB_CREATE_ATTEMPTS = 5
 JOB_CREATE_ATTEMPTS_DELAY = 5
 MAX_JOB_TRIALS = 5
 
+JOB_TIMEOUT = None
+
 
 def main():
     """Main"""
@@ -90,6 +92,7 @@ class ParallelRunnerMainSettings(pydantic_settings.BaseSettings):
     file_polling_interval: int = FILE_POLLING_INTERVAL
     max_job_create_attempts: int = MAX_JOB_CREATE_ATTEMPTS
     job_create_attempts_delay: int = JOB_CREATE_ATTEMPTS_DELAY
+    job_timeout: None | float = JOB_TIMEOUT
 
 
 if __name__ == "__main__":

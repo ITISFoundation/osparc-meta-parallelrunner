@@ -39,6 +39,7 @@ class ParallelRunner:
         max_job_trials=None,
         max_job_create_attempts=None,
         job_create_attempts_delay=None,
+        job_timeout=None,
     ):
         """Constructor"""
         self.test_mode = False
@@ -48,6 +49,7 @@ class ParallelRunner:
         self.max_job_trials = max_job_trials
         self.max_job_create_attempts = max_job_create_attempts
         self.job_create_attempts_delay = job_create_attempts_delay
+        self.job_timeout = job_timeout
 
         self.input_path = input_path  # path where osparc write all our input
         self.output_path = output_path  # path where osparc write all our input
@@ -291,13 +293,13 @@ class ParallelRunner:
         """Run a job with given inputs"""
 
         logger.debug(f"Sending inputs: {job_inputs}")
-
         if self.test_mode:
             logger.info("Map in test mode, just returning input")
 
             done_batch = self.process_job_outputs(
                 job_inputs, input_batch, "SUCCESS"
             )
+            time.sleep(1)
 
             return done_batch
 
@@ -443,7 +445,16 @@ class ParallelRunner:
 
                 job_inputs = self.create_job_inputs(task_input)
 
-                output_batch = self.run_job(job_inputs, batch)
+                with pathos.pools.ThreadPool(nodes=1) as timeout_pool:
+                    output_batch_waiter = timeout_pool.apipe(
+                        self.run_job, job_inputs, batch
+                    )
+                    output_batch = output_batch_waiter.get(
+                        timeout=self.job_timeout
+                    )
+                    timeout_pool.close()
+                    timeout_pool.join()
+                    timeout_pool.clear()  # Pool is singleton, need to clear old pool
 
                 self.n_of_finished_batches += 1
                 logger.info(
