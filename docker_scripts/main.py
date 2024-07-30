@@ -1,10 +1,10 @@
 import http.server
+import json
 import logging
 import pathlib as pl
 import socketserver
 import threading
 import time
-import typing
 
 import pydantic as pyda
 import pydantic_settings
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 HTTP_PORT = 8888
 INPUT_CONF_KEY = "input_3"
+CONF_SCHEMA_KEY = "conf_json_schema"
 
 FILE_POLLING_INTERVAL = 1  # second
 
@@ -25,11 +26,20 @@ MAX_JOB_CREATE_ATTEMPTS = 5
 JOB_CREATE_ATTEMPTS_DELAY = 5
 MAX_JOB_TRIALS = 5
 
+JOB_TIMEOUT = None
+
 
 def main():
     """Main"""
 
-    settings = MainSettings()
+    settings = ParallelRunnerMainSettings()
+    settings_schema = settings.model_json_schema()
+    logger.info(settings_schema)
+    conf_json_schema_path = (
+        settings.output_path / CONF_SCHEMA_KEY / "schema.json"
+    )
+    conf_json_schema_path.write_text(json.dumps(settings_schema, indent=2))
+
     config_path = settings.input_path / INPUT_CONF_KEY / "parallelrunner.json"
 
     http_dir_path = pl.Path(__file__).parent / "http"
@@ -71,7 +81,7 @@ def main():
         logger.error(f"{err} . Stopping %s", exc_info=True)
 
 
-class MainSettings(pydantic_settings.BaseSettings):
+class ParallelRunnerMainSettings(pydantic_settings.BaseSettings):
     batch_mode: bool = False
     file_polling_interval: int = FILE_POLLING_INTERVAL
     input_path: pyda.DirectoryPath = pyda.Field(alias="DY_SIDECAR_PATH_INPUTS")
@@ -82,6 +92,7 @@ class MainSettings(pydantic_settings.BaseSettings):
     file_polling_interval: int = FILE_POLLING_INTERVAL
     max_job_create_attempts: int = MAX_JOB_CREATE_ATTEMPTS
     job_create_attempts_delay: int = JOB_CREATE_ATTEMPTS_DELAY
+    job_timeout: None | float = JOB_TIMEOUT
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 name: ParallelRunner
 description: "ParallelRunnerService"
 key: simcore/services/dynamic/osparc-meta-parallelrunner
-version: 0.1.20
+version: 0.2.1
 integration-version: 2.0.0
 type: dynamic
 authors:
@@ -39,6 +39,11 @@ outputs:
     displayOrder: 1.0
     label: Output values
     description: Output files uploaded from the outputs folder
+    type: data:*/*
+  conf_json_schema:
+    displayOrder: 2.0
+    label: JSON schema
+    description: JSON schema of configuration file
     type: data:*/*
 boot-options:
   boot_mode:

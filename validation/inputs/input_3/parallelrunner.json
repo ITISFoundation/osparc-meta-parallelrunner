@@ -1,3 +1,4 @@
 {
-    "batch_mode": true
+    "batch_mode": true,
+    "job_timeout": 60
 }

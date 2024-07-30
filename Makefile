@@ -5,7 +5,7 @@ SHELL = /bin/sh
 MAKEFLAGS += -j2
 
 export DOCKER_IMAGE_NAME ?= osparc-meta-parallelrunner
-export DOCKER_IMAGE_TAG ?= 0.1.20
+export DOCKER_IMAGE_TAG ?= 0.2.1
 
 export MASTER_AWS_REGISTRY ?= registry.osparc-master-zmt.click
 export MASTER_REGISTRY ?= registry.osparc-master.speag.com
@@ -43,7 +43,7 @@ build: clean compose-spec	## build docker image
 	docker compose build
 
 validation-clean:
-	sudo rm -rf validation-tmp
+	rm -rf validation-tmp
 	cp -r validation validation-tmp
 	chmod -R 770 validation-tmp
 
