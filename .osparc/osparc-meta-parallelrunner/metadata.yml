@@ -12,27 +12,15 @@ contact: vangeit@itis.swiss
 inputs:
   input_0:
     displayOrder: 0.0
-    label: Template ID
+    label: Settings
     description:
-     Template ID
-    type: string
+     JSON file with settings for the parallel runner
+    type: data:*/*
   input_1:
-    displayOrder: 1.0
-    label: Number of workers
-    description:
-      Number of parallel workers to use to run the jobs
-    type: integer
-  input_2:
     displayOrder: 2.0
     label: Input parameters
     description:
       File with the parameter sets to evaluate
-    type: data:*/*
-  input_3:
-    displayOrder: 2.0
-    label: Settings
-    description:
-      JSON file with settings for the parallel runner
     type: data:*/*
 outputs:
   output_1:
