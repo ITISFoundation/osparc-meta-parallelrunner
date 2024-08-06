@@ -10,14 +10,14 @@ authors:
     affiliation: IT'IS Foundation
 contact: vangeit@itis.swiss
 inputs:
-  input_0:
+  input_1:
     displayOrder: 0.0
     label: Settings
     description:
      JSON file with settings for the parallel runner
     type: data:*/*
-  input_1:
-    displayOrder: 2.0
+  input_2:
+    displayOrder: 1.0
     label: Input parameters
     description:
       File with the parameter sets to evaluate
