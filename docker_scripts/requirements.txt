@@ -1,0 +1,5 @@
+pathos
+osparc
+pydantic-settings
+osparc-filecomms
+watchdog

@@ -14,7 +14,7 @@ RUN apt-get install --yes --no-install-recommends python3 python-is-python3 pyth
 # Copying boot scripts                                                                                                                                                                                                                                                                                                   
 COPY docker_scripts /docker
 
-RUN pip3 install pip pathos osparc pydantic-settings osparc-filecomms watchdog --upgrade
+RUN pip3 install -r /docker/requirements.txt 
 
 USER osparcuser
 

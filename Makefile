@@ -35,25 +35,25 @@ compose-spec: ## runs ooil to assemble the docker-compose.yml file
 		sh -c "cd /${DOCKER_IMAGE_NAME} && ooil compose"
 
 clean:
-	rm -rf docker-compose.yml
+	@rm -rf docker-compose.yml
 
 .PHONY: build
 build: clean compose-spec	## build docker image
-	chmod -R 755 docker_scripts
-	docker compose build
+	@chmod -R 755 docker_scripts
+	@docker compose build
 
 validation-clean:
-	rm -rf validation-tmp
-	cp -r validation validation-tmp
-	chmod -R 770 validation-tmp
+	@rm -rf validation-tmp
+	@cp -r validation validation-tmp
+	@chmod -R 770 validation-tmp
 
 validation_client_run: validation-clean
-	pip install osparc-filecomms
-	VALIDATION_CLIENT_INPUT_PATH=validation-tmp/outputs/output_1 VALIDATION_CLIENT_OUTPUT_PATH=validation-tmp/inputs/input_2 python validation-client/client.py
+	@pip install osparc-filecomms
+	@VALIDATION_CLIENT_INPUT_PATH=validation-tmp/outputs/output_1 VALIDATION_CLIENT_OUTPUT_PATH=validation-tmp/inputs/input_2 python validation-client/client.py
 
 docker_compose: validation-clean
-	docker compose down
-	docker compose --file docker-compose-local.yml up
+	@docker compose down
+	@docker compose --file docker-compose-local.yml up
 
 run-local-parallel: docker_compose validation_client_run
 
@@ -65,13 +65,11 @@ run-local: build
 publish-local: run-local ## push to local throw away registry to test integration
 	docker tag simcore/services/dynamic/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} $(LOCAL_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 	docker push $(LOCAL_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
-	@curl $(LOCAL_REGISTRY)/v2/_catalog | jq
 
 .PHONY: publish-master
 publish-master: run-local ## push to local throw away registry to test integration
 	docker tag simcore/services/dynamic/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} $(MASTER_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 	docker push $(MASTER_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
-	@curl $(MASTER_REGISTRY)/v2/_catalog | jq
 
 .PHONY: publish-staging
 publish-staging: run-local ## push to local throw away registry to test integration
@@ -82,7 +80,6 @@ publish-staging: run-local ## push to local throw away registry to test integrat
 publish-master-aws: ## push to local throw away registry to test integration
 	docker tag simcore/services/dynamic/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} $(MASTER_AWS_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 	docker push $(MASTER_AWS_REGISTRY)/simcore/services/dynamic/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
-	@curl $(MASTER_AWS_REGISTRY)/v2/_catalog | jq
 
 .PHONY: help
 help: ## this colorful help

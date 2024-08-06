@@ -80,7 +80,6 @@ class ParallelRunnerDynamicSettings:
     def __init__(self):
         self._settings = self.ParallelRunnerMainSettings()
         settings_schema = self._settings.model_json_schema()
-        logger.info(settings_schema)
         conf_json_schema_path = (
             self._settings.output_path / CONF_SCHEMA_KEY / "schema.json"
         )
