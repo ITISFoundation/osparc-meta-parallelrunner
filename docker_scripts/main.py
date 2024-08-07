@@ -1,9 +1,5 @@
-import http.server
 import json
 import logging
-import pathlib as pl
-import socketserver
-import threading
 
 import pydantic as pyda
 import pydantic_settings
@@ -39,42 +35,20 @@ def main():
 
     settings = ParallelRunnerDynamicSettings()
 
-    http_dir_path = pl.Path(__file__).parent / "http"
+    # Wait for and read the settings file
+    logger.info(
+        f"Waiting for settings file to appear at {settings.settings_file_path}"
+    )
+    settings.read_settings_file()
+    logger.info("Settings file was read")
 
-    class HTTPHandler(http.server.SimpleHTTPRequestHandler):
-        def __init__(self, *args, **kwargs):
-            super().__init__(
-                *args, **kwargs, directory=http_dir_path.resolve()
-            )
+    # Create and start the maprunner
+    maprunner = parallelrunner.ParallelRunner(settings)
+    maprunner.setup()
+    maprunner.start()
 
-    try:
-        logger.info(
-            f"Starting http server at port {HTTP_PORT} and serving path {http_dir_path}"
-        )
-        with socketserver.TCPServer(("", HTTP_PORT), HTTPHandler) as httpd:
-            # First start the empty web server
-            httpd_thread = threading.Thread(target=httpd.serve_forever)
-            httpd_thread.start()
-
-            # Wait for and read the settings file
-            logger.info(
-                f"Waiting for settings file to appear at {settings.settings_file_path}"
-            )
-            settings.read_settings_file()
-            logger.info("Settings file was read")
-
-            # Create and start the maprunner
-            maprunner = parallelrunner.ParallelRunner(settings)
-            maprunner.setup()
-            maprunner.start()
-
-            # Stop the maprunner
-            maprunner.teardown()
-
-            # Stop the webserver
-            httpd.shutdown()
-    except Exception as err:  # pylint: disable=broad-except
-        logger.error(f"{err} . Stopping %s", exc_info=True)
+    # Stop the maprunner
+    maprunner.teardown()
 
 
 class ParallelRunnerDynamicSettings:
@@ -89,6 +63,7 @@ class ParallelRunnerDynamicSettings:
         # Hide some settings from the user
         for field_name in [
             "max_number_of_workers",
+            "JOBS_STATUS_PATH",
             "DY_SIDECAR_PATH_INPUTS",
             "DY_SIDECAR_PATH_OUTPUTS",
         ]:
@@ -140,6 +115,7 @@ class ParallelRunnerDynamicSettings:
             default=DEFAULT_JOB_CREATE_ATTEMPTS_DELAY, gt=0
         )
         job_timeout: float = pyda.Field(default=DEFAULT_JOB_TIMEOUT, ge=0)
+        jobs_status_path: pyda.FilePath = pyda.Field(alias="JOBS_STATUS_PATH")
 
 
 if __name__ == "__main__":

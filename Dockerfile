@@ -10,25 +10,34 @@ ENV DEBCONF_NOWARNINGS="yes"
 RUN apk update && apk upgrade
 RUN apk add --no-cache python3 py3-pip wget bash su-exec
 
-# If you need a virtual environment
-RUN python3 -m venv /path/to/your/venv
-
-# If you want to set python3 as the default python
-RUN ln -sf python3 /usr/bin/python
-
 # Copying boot scripts                                                                                                                                                                                                                                                                                                   
 COPY docker_scripts /docker
 
 USER osparcuser
-WORKDIR /home/osparcuser
 
+WORKDIR /home/osparcuser
 RUN python3 -m venv venv
 RUN . ./venv/bin/activate && pip3 install -r /docker/requirements.txt 
 
-
 USER root
 
+WORKDIR /docker/http
+RUN npm install vite @vitejs/plugin-react --save-dev
+RUN npm create vite@latest dashboard -- --template react
+
+WORKDIR /docker/http/dashboard
+RUN npm install
+RUN npm install -D tailwindcss@latest postcss@latest autoprefixer@latest
+RUN npx tailwindcss init -p
+
+WORKDIR /docker/http/server
+RUN chown osparcuser:osparcuser jobs.json
+
+RUN npm install express
+RUN npm run build
+
+USER root
 EXPOSE 8888
+ENV JOBS_STATUS_PATH=/docker/http/server/jobs.json
 
 ENTRYPOINT [ "/bin/bash", "-c", "/docker/entrypoint.bash" ]
-CMD [ "/bin/bash", "-c", "/docker/runner.bash "]

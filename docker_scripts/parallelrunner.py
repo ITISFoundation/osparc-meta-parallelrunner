@@ -2,6 +2,7 @@ import contextlib
 import getpass
 import json
 import logging
+import multiprocessing
 import os
 import pathlib as pl
 import tempfile
@@ -55,6 +56,7 @@ class ParallelRunner:
             polling_interval=0.1,
             print_polling_interval=100,
         )
+        self.lock = multiprocessing.Lock()
 
     def setup(self):
         """Setup the Python Runner"""
@@ -368,6 +370,30 @@ class ParallelRunner:
 
         return task_input
 
+    def jobs_file_write_new(self, id, name, description, status):
+        with self.lock:
+            jobs_statuses = json.loads(
+                self.settings.jobs_status_path.read_text()
+            )
+            jobs_statuses[id] = {
+                "name": name,
+                "description": description,
+                "status": status,
+            }
+            self.settings.jobs_status_path.write_text(
+                json.dumps(jobs_statuses)
+            )
+
+    def jobs_file_write_status_change(self, id, status):
+        with self.lock:
+            jobs_statuses = json.loads(
+                self.settings.jobs_status_path.read_text()
+            )
+            jobs_statuses[id]["status"] = status
+            self.settings.jobs_status_path.write_text(
+                json.dumps(jobs_statuses)
+            )
+
     def run_batches(self, tasks_uuid, input_batches, number_of_workers):
         """Run the tasks"""
 
@@ -376,12 +402,17 @@ class ParallelRunner:
 
         self.n_of_finished_batches = 0
 
-        def map_func(batch, trial_number=1):
+        def map_func(batch_with_uuid, trial_number=1):
+            batch_uuid, batch = batch_with_uuid
             try:
                 logger.info(
                     "Running worker for a batch of " f"{len(batch)} tasks"
                 )
                 logger.debug(f"Running worker for batch: {batch}")
+                self.jobs_file_write_status_change(
+                    id=batch_uuid,
+                    status="running",
+                )
 
                 task_input = self.transform_batch_to_task_input(batch)
 
@@ -391,23 +422,37 @@ class ParallelRunner:
                     output_batch_waiter = timeout_pool.apipe(
                         self.run_job, job_inputs, batch
                     )
-                    output_batch = output_batch_waiter.get(
-                        timeout=self.settings.job_timeout
+                    job_timeout = (
+                        self.settings.job_timeout
+                        if self.settings.job_timeout > 0
+                        else None
                     )
+                    output_batch = output_batch_waiter.get(timeout=job_timeout)
                     timeout_pool.close()
                     timeout_pool.join()
                     timeout_pool.clear()  # Pool is singleton, need to clear old pool
+
+                self.jobs_file_write_status_change(
+                    id=batch_uuid,
+                    status="done",
+                )
 
                 self.n_of_finished_batches += 1
                 logger.info(
                     "Worker has finished batch "
                     f"{self.n_of_finished_batches} of {len(input_batches)}"
                 )
+
             except ParallelRunner.FatalException as error:
                 logger.info(
                     f"Batch {batch} failed with fatal error ({error}) in "
                     f"trial {trial_number}, not retrying, raising error"
                 )
+                self.jobs_file_write_status_change(
+                    id=batch_uuid,
+                    status="failed",
+                )
+
                 raise error
             except Exception as error:
                 if trial_number >= self.settings.max_job_trials:
@@ -415,6 +460,10 @@ class ParallelRunner:
                         f"Batch {batch} failed with error ({error}) in "
                         f"trial {trial_number}, reach max number of trials of "
                         f"{self.settings.max_job_trials}, not retrying, raising error"
+                    )
+                    self.jobs_file_write_status_change(
+                        id=batch_uuid,
+                        status="failed",
                     )
                     raise error
                 else:
@@ -431,8 +480,21 @@ class ParallelRunner:
         logger.info(
             f"Starting {len(input_batches)} batches on {number_of_workers} workers"
         )
+
+        input_batches_with_uuid = [
+            (str(uuid.uuid4()), input_batch) for input_batch in input_batches
+        ]
+
+        for batch_uuid, input_batch in input_batches_with_uuid:
+            self.jobs_file_write_new(
+                id=batch_uuid,
+                name=f"Batch {batch_uuid}",
+                description=str(input_batch),
+                status="todo",
+            )
+
         with pathos.pools.ThreadPool(nodes=number_of_workers) as pool:
-            output_tasks = list(pool.map(map_func, input_batches))
+            output_tasks = list(pool.map(map_func, input_batches_with_uuid))
             pool.close()
             pool.join()
             pool.clear()  # Pool is singleton, need to clear old pool
