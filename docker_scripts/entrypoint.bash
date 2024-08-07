@@ -8,7 +8,7 @@ echo "$INFO" "Starting container for parallelrunner ..."
 
 HOST_USERID=$(stat -c %u "${DY_SIDECAR_PATH_INPUTS}")
 HOST_GROUPID=$(stat -c %g "${DY_SIDECAR_PATH_INPUTS}")
-CONTAINER_GROUPNAME=$(getent group | grep "${HOST_GROUPID}" | cut --delimiter=: --fields=1 || echo "")
+CONTAINER_GROUPNAME=$(grep ":${HOST_GROUPID}:" /etc/group | cut -d: -f1 || echo "")
 
 OSPARC_USER='osparcuser'
 
@@ -27,7 +27,7 @@ else
 	fi
 
 	echo "adding $OSPARC_USER to group $CONTAINER_GROUPNAME..."
-	usermod --append --groups "$CONTAINER_GROUPNAME" "$OSPARC_USER"
+	addgroup "$OSPARC_USER" "$CONTAINER_GROUPNAME"
 
 	echo "changing owner ship of state directory /home/${OSPARC_USER}/work/workspace"
 	chown --recursive "$OSPARC_USER" "/home/${OSPARC_USER}/work/workspace"
@@ -37,4 +37,4 @@ else
 	chown --recursive "$OSPARC_USER" "${DY_SIDECAR_PATH_OUTPUTS}"
 fi
 
-exec gosu "$OSPARC_USER" /docker/main.bash
+exec su-exec "$OSPARC_USER" /docker/main.bash

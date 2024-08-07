@@ -1,24 +1,30 @@
-FROM ubuntu:22.04 as base
+FROM node:alpine as base
 
-RUN useradd -m -r osparcuser
+RUN adduser osparcuser --disabled-password
 
 USER root
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV DEBCONF_NOWARNINGS="yes"
 
-RUN apt-get update --yes && apt-get upgrade --yes 
-RUN apt-get install -y --no-install-recommends apt-utils
-RUN apt-get install --yes --no-install-recommends python3 python-is-python3 python3-venv wget python3-pip gosu
+RUN apk update && apk upgrade
+RUN apk add --no-cache python3 py3-pip wget bash su-exec
+
+# If you need a virtual environment
+RUN python3 -m venv /path/to/your/venv
+
+# If you want to set python3 as the default python
+RUN ln -sf python3 /usr/bin/python
 
 # Copying boot scripts                                                                                                                                                                                                                                                                                                   
 COPY docker_scripts /docker
 
-RUN pip3 install -r /docker/requirements.txt 
-
 USER osparcuser
-
 WORKDIR /home/osparcuser
+
+RUN python3 -m venv venv
+RUN . ./venv/bin/activate && pip3 install -r /docker/requirements.txt 
+
 
 USER root
 

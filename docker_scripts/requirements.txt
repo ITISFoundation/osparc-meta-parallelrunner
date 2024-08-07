@@ -1,5 +1,6 @@
 pathos
 osparc
+pydantic
 pydantic-settings
 osparc-filecomms
 watchdog
