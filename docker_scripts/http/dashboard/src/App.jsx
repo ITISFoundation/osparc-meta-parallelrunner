@@ -7,35 +7,56 @@ const statusColors = {
   failed: 'bg-red-700'
 };
 
-const statusOptions = ['todo', 'running', 'done', 'failed'];
+const StatusIcon = ({ status }) => {
+  switch (status) {
+    case 'todo':
+      return (
+        <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+        </svg>
+      );
+    case 'running':
+      return (
+        <svg className="w-6 h-6 text-blue-300 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      );
+    case 'done':
+      return (
+        <svg className="w-6 h-6 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      );
+    case 'failed':
+      return (
+        <svg className="w-6 h-6 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+};
 
-const JobCard = ({ id, job, onStatusChange }) => (
+const JobCard = ({ job }) => (
   <div
     className={`p-4 mb-2 rounded shadow ${statusColors[job.status]} transition-all duration-300 ease-in-out`}
   >
-    <h3 className="font-bold text-white">{job.name}</h3>
-    <p className="mb-2 text-gray-300">{job.description}</p>
-    <select 
-      value={job.status} 
-      onChange={(e) => onStatusChange(id, e.target.value)}
-      className="mt-2 p-1 rounded border border-gray-600 bg-gray-800 text-white"
-    >
-      {statusOptions.map(status => (
-        <option key={status} value={status}>
-          {status.charAt(0).toUpperCase() + status.slice(1)}
-        </option>
-      ))}
-    </select>
+    <div className="flex justify-between items-center mb-2">
+      <h3 className="font-bold text-white">{job.name}</h3>
+      <StatusIcon status={job.status} />
+    </div>
+    <p className="text-gray-300">{job.description}</p>
   </div>
 );
 
-const StatusColumn = ({ title, jobs, onStatusChange }) => (
+const StatusColumn = ({ title, jobs }) => (
   <div className="flex-1 flex flex-col h-full p-4 overflow-hidden border-r border-gray-700">
     <h2 className="text-xl font-bold mb-2 text-gray-200">{title}</h2>
     <p className="text-sm text-gray-400 mb-4">Jobs: {Object.keys(jobs).length}</p>
     <div className="flex-1 overflow-y-auto pr-2">
       {Object.entries(jobs).map(([id, job]) => (
-        <JobCard key={id} id={id} job={job} onStatusChange={onStatusChange} />
+        <JobCard key={id} job={job} />
       ))}
     </div>
   </div>
@@ -64,32 +85,10 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchJobs();
-    const intervalId = setInterval(fetchJobs, 1000); // Refresh every 5 seconds
+    const intervalId = setInterval(fetchJobs, 5000); // Refresh every 5 seconds
 
     return () => clearInterval(intervalId);
   }, [fetchJobs]);
-
-  const handleStatusChange = async (id, newStatus) => {
-    try {
-      const response = await fetch(`/api/jobs/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      setJobs(prevJobs => ({
-        ...prevJobs,
-        [id]: { ...prevJobs[id], status: newStatus }
-      }));
-    } catch (e) {
-      console.error("Failed to update job status:", e);
-      // Handle the error appropriately in your UI
-    }
-  };
 
   const jobsByStatus = Object.entries(jobs).reduce((acc, [id, job]) => {
     if (!acc[job.status]) acc[job.status] = {};
@@ -107,10 +106,10 @@ const Dashboard = () => {
 
   return (
     <div className="flex flex-row h-screen bg-gray-900 text-white">
-      <StatusColumn title="To Do" jobs={jobsByStatus.todo} onStatusChange={handleStatusChange} />
-      <StatusColumn title="Running" jobs={jobsByStatus.running} onStatusChange={handleStatusChange} />
-      <StatusColumn title="Done" jobs={jobsByStatus.done} onStatusChange={handleStatusChange} />
-      <StatusColumn title="Failed" jobs={jobsByStatus.failed} onStatusChange={handleStatusChange} />
+      <StatusColumn title="To Do" jobs={jobsByStatus.todo} />
+      <StatusColumn title="Running" jobs={jobsByStatus.running} />
+      <StatusColumn title="Done" jobs={jobsByStatus.done} />
+      <StatusColumn title="Failed" jobs={jobsByStatus.failed} />
     </div>
   );
 };
@@ -124,4 +123,3 @@ const App = () => {
 }
 
 export default App;
-
