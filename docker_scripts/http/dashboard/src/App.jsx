@@ -39,14 +39,20 @@ const StatusIcon = ({ status }) => {
 };
 
 const JobCard = ({ job }) => (
-  <div
-    className={`p-4 mb-2 rounded shadow ${statusColors[job.status]} transition-all duration-300 ease-in-out`}
-  >
-    <div className="flex justify-between items-center mb-2">
-      <h3 className="font-bold text-white">{job.name}</h3>
-      <StatusIcon status={job.status} />
+  <div className="relative mb-2 group">
+    <div className={`p-3 rounded shadow ${statusColors[job.status]} transition-all duration-300 ease-in-out group-hover:shadow-lg`}>
+      <div className="flex justify-between items-center">
+        <h3 className="font-bold text-white truncate">{job.name}</h3>
+        <StatusIcon status={job.status} />
+      </div>
     </div>
-    <p className="text-gray-300">{job.description}</p>
+    <div className={`absolute top-0 left-0 w-full p-3 rounded shadow ${statusColors[job.status]} opacity-0 group-hover:opacity-100 transition-all duration-300 ease-in-out z-10`}>
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="font-bold text-white">{job.name}</h3>
+        <StatusIcon status={job.status} />
+      </div>
+      <p className="text-gray-300 mt-2">{job.description}</p>
+    </div>
   </div>
 );
 
