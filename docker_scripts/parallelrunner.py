@@ -2,6 +2,7 @@ import contextlib
 import getpass
 import json
 import logging
+import multiprocessing
 import os
 import pathlib as pl
 import tempfile
@@ -15,50 +16,27 @@ import osparc_client.models.file
 import pathos
 from osparc_filecomms import handshakers
 
+import tools
+
 logging.basicConfig(
     level=logging.INFO, format="[%(filename)s:%(lineno)d] %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 
-MAX_N_OF_WORKERS = 10
-
-TEMPLATE_ID_KEY = "input_0"
-N_OF_WORKERS_KEY = "input_1"
-INPUT_PARAMETERS_KEY = "input_2"
-
-
 class ParallelRunner:
-    def __init__(
-        self,
-        input_path,
-        output_path,
-        max_n_of_workers=MAX_N_OF_WORKERS,
-        batch_mode=False,
-        file_polling_interval=None,
-        max_job_trials=None,
-        max_job_create_attempts=None,
-        job_create_attempts_delay=None,
-        job_timeout=None,
-    ):
+    def __init__(self, settings):
         """Constructor"""
+        self.settings = settings
+
         self.test_mode = False
 
-        self.batch_mode = batch_mode
-        self.max_n_of_workers = max_n_of_workers
-        self.max_job_trials = max_job_trials
-        self.max_job_create_attempts = max_job_create_attempts
-        self.job_create_attempts_delay = job_create_attempts_delay
-        self.job_timeout = job_timeout
+        self.key_values_path = self.settings.input_path / "key_values.json"
 
-        self.input_path = input_path  # path where osparc write all our input
-        self.output_path = output_path  # path where osparc write all our input
-        self.key_values_path = self.input_path / "key_values.json"
-
-        self.input_tasks_dir_path = self.input_path / "input_2"
+        self.input_tasks_dir_path = self.settings.input_path / "input_2"
         self.input_tasks_path = self.input_tasks_dir_path / "input_tasks.json"
 
-        self.output_tasks_dir_path = self.output_path / "output_1"
+        self.output_tasks_dir_path = self.settings.output_path / "output_1"
         self.output_tasks_path = (
             self.output_tasks_dir_path / "output_tasks.json"
         )
@@ -66,7 +44,6 @@ class ParallelRunner:
         if self.output_tasks_path.exists():
             self.output_tasks_path.unlink()
 
-        self.file_polling_interval = file_polling_interval
         self.caller_uuid = None
         self.uuid = str(uuid.uuid4())
 
@@ -79,12 +56,11 @@ class ParallelRunner:
             polling_interval=0.1,
             print_polling_interval=100,
         )
+        self.lock = multiprocessing.Lock()
 
     def setup(self):
         """Setup the Python Runner"""
-        logger.info(f"Using host: [{os.environ['OSPARC_API_HOST']}]")
-        logger.info(f"Using key: [{os.environ['OSPARC_API_KEY']}]")
-        logger.info(f"Using secret: [{os.environ['OSPARC_API_SECRET']}]")
+        logger.info(f"Using API host: [{os.environ['OSPARC_API_HOST']}]")
         self.osparc_cfg = osparc.Configuration(
             host=os.environ["OSPARC_API_HOST"],
             username=os.environ["OSPARC_API_KEY"],
@@ -104,70 +80,36 @@ class ParallelRunner:
         logger.info("Starting map ...")
 
         logger.info(f"User: {getpass.getuser()}, UID: {os.getuid()}")
-        logger.info(f"Input path: {self.input_path.resolve()}")
-
-        waiter = 0
-        while not self.key_values_path.exists():
-            if waiter % 10 == 0:
-                logger.info("Waiting for key_values.json to exist ...")
-            time.sleep(self.file_polling_interval)
-            waiter += 1
-
-        key_values = json.loads(self.key_values_path.read_text())
+        logger.info(f"Input path: {self.settings.input_path.resolve()}")
 
         self.caller_uuid = self.handshaker.shake()
         logger.info(f"Performed handshake with caller: {self.caller_uuid}")
 
-        waiter = 0
-        while (
-            INPUT_PARAMETERS_KEY not in key_values
-            or key_values[INPUT_PARAMETERS_KEY]["value"] is None
-            or TEMPLATE_ID_KEY not in key_values
-            or key_values[TEMPLATE_ID_KEY]["value"] is None
-            or N_OF_WORKERS_KEY not in key_values
-            or key_values[N_OF_WORKERS_KEY]["value"] is None
-        ):
-            if waiter % 10 == 0:
-                logger.info(
-                    "Waiting for all required keys to "
-                    f"exist in key_values, current content: {key_values}..."
-                )
-            key_values = json.loads(self.key_values_path.read_text())
-            time.sleep(self.file_polling_interval)
-            waiter += 1
-
-        self.template_id = key_values[TEMPLATE_ID_KEY]["value"]
-        if self.template_id is None:
+        if self.settings.template_id is None:
             raise ValueError("Template ID can't be None")
 
-        if self.template_id == "TEST_UUID":
+        if self.settings.template_id == "TEST_UUID":
             self.test_mode = True
             self.api_client = None
             self.studies_api = None
 
-        n_of_workers = key_values[N_OF_WORKERS_KEY]["value"]
-        if n_of_workers is None:
+        if self.settings.number_of_workers is None:
             raise ValueError("Number of workers can't be None")
-        elif n_of_workers > self.max_n_of_workers:
-            logger.warning(
-                "Attempt to set number of workers to more than "
-                f"is allowed ({self.max_n_of_workers}), limiting value "
-                "to maximum amount"
+        elif (
+            self.settings.number_of_workers
+            > self.settings.max_number_of_workers
+        ):
+            raise ValueError(
+                "Attempt to set number of workers to "
+                f"{self.settings.number_of_workers} which is more than "
+                f"is allowed ({self.settings.max_number_of_workers}), "
+                "limit value to maximum amount"
             )
-            n_of_workers = self.max_n_of_workers
 
         last_tasks_uuid = ""
         waiter_wrong_uuid = 0
         while True:
-            waiter_input_exists = 0
-            while not self.input_tasks_path.exists():
-                if waiter_input_exists % 10 == 0:
-                    logger.info(
-                        f"Waiting for input file at {self.input_tasks_path}..."
-                    )
-                    self.handshaker.retry_last_write()
-                time.sleep(self.file_polling_interval)
-                waiter_input_exists += 1
+            tools.wait_for_path(self.input_tasks_path)
 
             input_dict = json.loads(self.input_tasks_path.read_text())
             command = input_dict["command"]
@@ -179,7 +121,7 @@ class ParallelRunner:
                         "Received command with wrong caller uuid: "
                         f"{caller_uuid} or map uuid: {map_uuid}"
                     )
-                time.sleep(self.file_polling_interval)
+                time.sleep(self.settings.file_polling_interval)
                 waiter_wrong_uuid += 1
                 continue
 
@@ -191,40 +133,42 @@ class ParallelRunner:
                 if tasks_uuid == last_tasks_uuid:
                     if waiter_wrong_uuid % 10 == 0:
                         logger.info("Waiting for new tasks uuid")
-                    time.sleep(self.file_polling_interval)
+                    time.sleep(self.settings.file_polling_interval)
                     waiter_wrong_uuid += 1
                 else:
                     input_tasks = input_dict["tasks"]
 
-                    if self.batch_mode:
-                        n_of_batches = n_of_workers
-                    else:
-                        n_of_batches = len(input_tasks)
-
-                    input_batches = self.batch_input_tasks(
-                        input_tasks, n_of_batches
-                    )
-
-                    output_batches = self.run_batches(
-                        tasks_uuid, input_batches, n_of_workers
-                    )
-
-                    output_tasks = self.unbatch_output_tasks(output_batches)
-
-                    output_tasks_content = json.dumps(
-                        {"uuid": tasks_uuid, "tasks": output_tasks}
-                    )
-                    self.output_tasks_path.write_text(output_tasks_content)
-                    logger.info(f"Finished a set of {len(output_tasks)} tasks")
-                    logger.debug(
-                        f"Finished a set of tasks: {output_tasks_content}"
-                    )
+                    self.run_input_tasks(input_tasks, tasks_uuid)
                     last_tasks_uuid = tasks_uuid
                     waiter_wrong_uuid = 0
             else:
                 raise ValueError("Command unknown: {command}")
 
-            time.sleep(self.file_polling_interval)
+            time.sleep(self.settings.file_polling_interval)
+
+    def run_input_tasks(self, input_tasks, tasks_uuid):
+        number_of_workers = self.settings.number_of_workers
+        batch_mode = self.settings.batch_mode
+
+        if batch_mode:
+            n_of_batches = number_of_workers
+        else:
+            n_of_batches = len(input_tasks)
+
+        input_batches = self.batch_input_tasks(input_tasks, n_of_batches)
+
+        output_batches = self.run_batches(
+            tasks_uuid, input_batches, number_of_workers
+        )
+
+        output_tasks = self.unbatch_output_tasks(output_batches)
+
+        output_tasks_content = json.dumps(
+            {"uuid": tasks_uuid, "tasks": output_tasks}
+        )
+        self.output_tasks_path.write_text(output_tasks_content)
+        logger.info(f"Finished a set of {len(output_tasks)} tasks")
+        logger.debug(f"Finished a set of tasks: {output_tasks_content}")
 
     def batch_input_tasks(self, input_tasks, n_of_batches):
         batches = [[] for _ in range(n_of_batches)]
@@ -304,15 +248,15 @@ class ParallelRunner:
             return done_batch
 
         with self.create_study_job(
-            self.template_id, job_inputs, self.studies_api
+            self.settings.template_id, job_inputs, self.studies_api
         ) as job:
             job_status = self.studies_api.start_study_job(
-                study_id=self.template_id, job_id=job.id
+                study_id=self.settings.template_id, job_id=job.id
             )
 
             while job_status.stopped_at is None:
                 job_status = self.studies_api.inspect_study_job(
-                    study_id=self.template_id, job_id=job.id
+                    study_id=self.settings.template_id, job_id=job.id
                 )
                 time.sleep(1)
 
@@ -325,7 +269,7 @@ class ParallelRunner:
                 )
             else:
                 job_outputs = self.studies_api.get_study_job_outputs(
-                    study_id=self.template_id, job_id=job.id
+                    study_id=self.settings.template_id, job_id=job.id
                 ).results
 
             done_batch = self.process_job_outputs(
@@ -335,7 +279,7 @@ class ParallelRunner:
         return done_batch
 
     def process_job_outputs(self, results, batch, status):
-        if self.template_id == "TEST_UUID":
+        if self.settings.template_id == "TEST_UUID":
             logger.info("Map in test mode, just returning input")
 
             return batch
@@ -382,12 +326,12 @@ class ParallelRunner:
                 else:
                     output[probe_name]["value"] = probe_output
 
-                if self.batch_mode and probe_type == "FileJSON":
+                if self.settings.batch_mode and probe_type == "FileJSON":
                     output[probe_name]["value"] = output[probe_name]["value"][
                         task_i
                     ]
                 else:
-                    if self.batch_mode:
+                    if self.settings.batch_mode:
                         raise ParallelRunner.FatalException(
                             "Only FileJSON output allowed in batch mode, "
                             f"received {probe_type} for {probe_name} output"
@@ -402,7 +346,7 @@ class ParallelRunner:
             for param_name, param_input in input.items():
                 param_type = param_input["type"]
 
-                if param_type == "FileJSON" and self.batch_mode:
+                if param_type == "FileJSON" and self.settings.batch_mode:
                     param_filename = param_input["filename"]
                     param_value = param_input["value"]
 
@@ -426,7 +370,31 @@ class ParallelRunner:
 
         return task_input
 
-    def run_batches(self, tasks_uuid, input_batches, n_of_workers):
+    def jobs_file_write_new(self, id, name, description, status):
+        with self.lock:
+            jobs_statuses = json.loads(
+                self.settings.jobs_status_path.read_text()
+            )
+            jobs_statuses[id] = {
+                "name": name,
+                "description": description,
+                "status": status,
+            }
+            self.settings.jobs_status_path.write_text(
+                json.dumps(jobs_statuses)
+            )
+
+    def jobs_file_write_status_change(self, id, status):
+        with self.lock:
+            jobs_statuses = json.loads(
+                self.settings.jobs_status_path.read_text()
+            )
+            jobs_statuses[id]["status"] = status
+            self.settings.jobs_status_path.write_text(
+                json.dumps(jobs_statuses)
+            )
+
+    def run_batches(self, tasks_uuid, input_batches, number_of_workers):
         """Run the tasks"""
 
         logger.info(f"Evaluating {len(input_batches)} batches")
@@ -434,12 +402,17 @@ class ParallelRunner:
 
         self.n_of_finished_batches = 0
 
-        def map_func(batch, trial_number=1):
+        def map_func(batch_with_uuid, trial_number=1):
+            batch_uuid, batch = batch_with_uuid
             try:
                 logger.info(
                     "Running worker for a batch of " f"{len(batch)} tasks"
                 )
                 logger.debug(f"Running worker for batch: {batch}")
+                self.jobs_file_write_status_change(
+                    id=batch_uuid,
+                    status="running",
+                )
 
                 task_input = self.transform_batch_to_task_input(batch)
 
@@ -449,30 +422,48 @@ class ParallelRunner:
                     output_batch_waiter = timeout_pool.apipe(
                         self.run_job, job_inputs, batch
                     )
-                    output_batch = output_batch_waiter.get(
-                        timeout=self.job_timeout
+                    job_timeout = (
+                        self.settings.job_timeout
+                        if self.settings.job_timeout > 0
+                        else None
                     )
+                    output_batch = output_batch_waiter.get(timeout=job_timeout)
                     timeout_pool.close()
                     timeout_pool.join()
                     timeout_pool.clear()  # Pool is singleton, need to clear old pool
+
+                self.jobs_file_write_status_change(
+                    id=batch_uuid,
+                    status="done",
+                )
 
                 self.n_of_finished_batches += 1
                 logger.info(
                     "Worker has finished batch "
                     f"{self.n_of_finished_batches} of {len(input_batches)}"
                 )
+
             except ParallelRunner.FatalException as error:
                 logger.info(
                     f"Batch {batch} failed with fatal error ({error}) in "
                     f"trial {trial_number}, not retrying, raising error"
                 )
+                self.jobs_file_write_status_change(
+                    id=batch_uuid,
+                    status="failed",
+                )
+
                 raise error
             except Exception as error:
-                if trial_number >= self.max_job_trials:
+                if trial_number >= self.settings.max_job_trials:
                     logger.info(
                         f"Batch {batch} failed with error ({error}) in "
                         f"trial {trial_number}, reach max number of trials of "
-                        f"{self.max_job_trials}, not retrying, raising error"
+                        f"{self.settings.max_job_trials}, not retrying, raising error"
+                    )
+                    self.jobs_file_write_status_change(
+                        id=batch_uuid,
+                        status="failed",
                     )
                     raise error
                 else:
@@ -487,10 +478,23 @@ class ParallelRunner:
             return output_batch
 
         logger.info(
-            f"Starting {len(input_batches)} batches on {n_of_workers} workers"
+            f"Starting {len(input_batches)} batches on {number_of_workers} workers"
         )
-        with pathos.pools.ThreadPool(nodes=n_of_workers) as pool:
-            output_tasks = list(pool.map(map_func, input_batches))
+
+        input_batches_with_uuid = [
+            (str(uuid.uuid4()), input_batch) for input_batch in input_batches
+        ]
+
+        for batch_uuid, input_batch in input_batches_with_uuid:
+            self.jobs_file_write_new(
+                id=batch_uuid,
+                name=f"Batch {batch_uuid}",
+                description=str(input_batch),
+                status="todo",
+            )
+
+        with pathos.pools.ThreadPool(nodes=number_of_workers) as pool:
+            output_tasks = list(pool.map(map_func, input_batches_with_uuid))
             pool.close()
             pool.join()
             pool.clear()  # Pool is singleton, need to clear old pool
@@ -527,7 +531,10 @@ class ParallelRunner:
                 )
                 break
             except osparc_client.exceptions.ApiException as api_exception:
-                if n_of_create_attempts >= self.max_job_create_attempts:
+                if (
+                    n_of_create_attempts
+                    >= self.settings.max_job_create_attempts
+                ):
                     raise Exception(
                         f"Tried {n_of_create_attempts} times to create a job from "
                         "the study, but failed"
@@ -542,7 +549,7 @@ class ParallelRunner:
                         "Received an unhandled API Exception from server "
                         "when creating job, retrying..."
                     )
-                time.sleep(self.job_create_attempts_delay)
+                time.sleep(self.settings.job_create_attempts_delay)
 
         try:
             yield job

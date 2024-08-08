@@ -1,0 +1,17 @@
+{
+  "name": "job-status-server",
+  "version": "1.0.0",
+  "description": "Server for Job Status Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "cd ../dashboard && npm install && npm run build",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.12"
+  }
+}

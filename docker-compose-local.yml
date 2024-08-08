@@ -1,6 +1,6 @@
 services:
   osparc-meta-parallelrunner:
-    image: simcore/services/dynamic/osparc-meta-parallelrunner:0.2.1
+    image: simcore/services/dynamic/osparc-meta-parallelrunner:1.0.1
     ports:
       - "8888:8888"
     environment:

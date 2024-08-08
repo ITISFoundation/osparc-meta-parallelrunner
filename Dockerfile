@@ -1,29 +1,43 @@
-FROM ubuntu:22.04 as base
+FROM node:alpine as base
 
-RUN useradd -m -r osparcuser
+RUN adduser osparcuser --disabled-password
 
 USER root
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV DEBCONF_NOWARNINGS="yes"
 
-RUN apt-get update --yes && apt-get upgrade --yes 
-RUN apt-get install -y --no-install-recommends apt-utils
-RUN apt-get install --yes --no-install-recommends python3 python-is-python3 python3-venv wget python3-pip gosu
-
+RUN apk update && apk upgrade
+RUN apk add --no-cache python3 py3-pip wget bash su-exec
 
 # Copying boot scripts                                                                                                                                                                                                                                                                                                   
 COPY docker_scripts /docker
 
-RUN pip3 install pathos osparc pydantic-settings osparc-filecomms --upgrade
-
 USER osparcuser
 
 WORKDIR /home/osparcuser
+RUN python3 -m venv venv
+RUN . ./venv/bin/activate && pip3 install -r /docker/requirements.txt 
 
 USER root
 
+WORKDIR /docker/http
+RUN npm install vite @vitejs/plugin-react --save-dev
+RUN npm create vite@latest dashboard -- --template react
+
+WORKDIR /docker/http/dashboard
+RUN npm install
+RUN npm install -D tailwindcss@latest postcss@latest autoprefixer@latest
+RUN npx tailwindcss init -p
+
+WORKDIR /docker/http/server
+RUN chown osparcuser:osparcuser jobs.json
+
+RUN npm install express
+RUN npm run build
+
+USER root
 EXPOSE 8888
+ENV JOBS_STATUS_PATH=/docker/http/server/jobs.json
 
 ENTRYPOINT [ "/bin/bash", "-c", "/docker/entrypoint.bash" ]
-CMD [ "/bin/bash", "-c", "/docker/runner.bash "]
