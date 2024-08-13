@@ -2,4 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
-/* You can add any additional global styles below this line */
+@keyframes progress-mac {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-progress-mac {
+  animation: progress-mac 2s linear infinite;
+}

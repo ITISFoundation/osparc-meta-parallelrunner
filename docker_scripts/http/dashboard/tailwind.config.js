@@ -5,7 +5,11 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      animation: {
+        'progress-mac': 'progress-mac 2s linear infinite',
+      },
+    },
   },
   plugins: [],
 }
