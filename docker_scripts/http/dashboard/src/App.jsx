@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react'
 
 const statusColors = {
-  todo: 'bg-gray-300', // Changed to a light grey
-  running: 'bg-blue-700',
   done: 'bg-green-700',
-  failed: 'bg-red-700'
+  failed: 'bg-red-700',
+  running: 'bg-blue-700',
+  todo: 'bg-gray-300'
 };
 
 const StatusIcon = ({ status }) => {
@@ -41,10 +41,10 @@ const StatusIcon = ({ status }) => {
 const ProgressBar = ({ jobsByStatus }) => {
   const total = Object.values(jobsByStatus).reduce((acc, jobs) => acc + Object.keys(jobs).length, 0);
   const widths = {
-    todo: (Object.keys(jobsByStatus.todo).length / total) * 100,
-    running: (Object.keys(jobsByStatus.running).length / total) * 100,
     done: (Object.keys(jobsByStatus.done).length / total) * 100,
-    failed: (Object.keys(jobsByStatus.failed).length / total) * 100
+    failed: (Object.keys(jobsByStatus.failed).length / total) * 100,
+    running: (Object.keys(jobsByStatus.running).length / total) * 100,
+    todo: (Object.keys(jobsByStatus.todo).length / total) * 100
   };
 
   return (
@@ -160,4 +160,3 @@ const App = () => {
 }
 
 export default App;
-
