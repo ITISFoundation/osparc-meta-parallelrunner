@@ -1,0 +1,6 @@
+{
+    "template_id": "TEST_UUID",
+    "number_of_workers": 2,
+    "batch_mode": true,
+    "job_timeout": 60
+}

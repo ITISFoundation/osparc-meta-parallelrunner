@@ -1,6 +1,14 @@
 #!/bin/bash
 
-pip install -r /docker/requirements.txt
-echo "Starting map python code"
-python3 /docker/main.py
-echo "Closing map python code"
+set -e
+
+echo "Starting webserver"
+cd /docker/http/server
+npm start &
+
+echo "Starting parallelrunner python code"
+cd ${HOME}
+source ./venv/bin/activate
+python /docker/main.py
+
+echo "Closing parallelrunner"

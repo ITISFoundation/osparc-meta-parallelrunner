@@ -1,7 +1,7 @@
 name: ParallelRunner
 description: "ParallelRunnerService"
 key: simcore/services/dynamic/osparc-meta-parallelrunner
-version: 0.2.1
+version: 1.0.1
 integration-version: 2.0.0
 type: dynamic
 authors:
@@ -10,29 +10,17 @@ authors:
     affiliation: IT'IS Foundation
 contact: vangeit@itis.swiss
 inputs:
-  input_0:
-    displayOrder: 0.0
-    label: Template ID
-    description:
-     Template ID
-    type: string
   input_1:
-    displayOrder: 1.0
-    label: Number of workers
+    displayOrder: 0.0
+    label: Settings
     description:
-      Number of parallel workers to use to run the jobs
-    type: integer
+     JSON file with settings for the parallel runner
+    type: data:*/*
   input_2:
-    displayOrder: 2.0
+    displayOrder: 1.0
     label: Input parameters
     description:
       File with the parameter sets to evaluate
-    type: data:*/*
-  input_3:
-    displayOrder: 2.0
-    label: Settings
-    description:
-      JSON file with settings for the parallel runner
     type: data:*/*
 outputs:
   output_1:
