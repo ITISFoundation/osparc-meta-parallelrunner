@@ -45,7 +45,7 @@ def main():
     map_uuid = handshaker.shake()
     input_tasks["map_uuid"] = map_uuid
 
-    input_tasks_path.write_text(json.dumps(input_tasks))
+    input_tasks_path.write_text('{') #json.dumps(input_tasks))
 
     while not os.path.exists(output_tasks_path):
         time.sleep(0.1)
