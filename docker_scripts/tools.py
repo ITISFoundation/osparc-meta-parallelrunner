@@ -1,7 +1,17 @@
+import json
+import logging
 import pathlib as pl
+import time
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
+
+DEFAULT_FILE_POLLING_INTERVAL = 5
+
+logging.basicConfig(
+    level=logging.INFO, format="[%(filename)s:%(lineno)d] %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 def wait_for_path(file_path):
@@ -41,3 +51,18 @@ def wait_for_path(file_path):
     finally:
         observer.stop()
         observer.join()
+
+def load_json(file_path: pl.Path, wait=True, 
+              file_polling_interval=DEFAULT_FILE_POLLING_INTERVAL):
+    if wait:
+        wait_for_path(file_path)
+
+    while True:
+        try:
+            content = json.loads(file_path.read_text())
+            break
+        except json.decoder.JSONDecodeError:
+            logger.info(f"JSON read error, retrying read from {file_path}")
+            time.sleep(file_polling_interval)
+
+    return content

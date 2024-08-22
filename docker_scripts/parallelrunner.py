@@ -111,7 +111,7 @@ class ParallelRunner:
         while True:
             tools.wait_for_path(self.input_tasks_path)
 
-            input_dict = json.loads(self.input_tasks_path.read_text())
+            input_dict = tools.load_json(self.input_tasks_path)
             command = input_dict["command"]
             caller_uuid = input_dict["caller_uuid"]
             map_uuid = input_dict["map_uuid"]
@@ -303,8 +303,8 @@ class ParallelRunner:
                             zip_file,
                             at=output[probe_name]["filename"],
                         )
-                        file_results = json.loads(
-                            file_results_path.read_text()
+                        file_results = tools.load_json(
+                            file_results_path
                         )
 
                     output[probe_name]["value"] = file_results
@@ -372,8 +372,8 @@ class ParallelRunner:
 
     def jobs_file_write_new(self, id, name, description, status):
         with self.lock:
-            jobs_statuses = json.loads(
-                self.settings.jobs_status_path.read_text()
+            jobs_statuses = tools.load_json(
+                self.settings.jobs_status_path
             )
             jobs_statuses[id] = {
                 "name": name,
@@ -386,8 +386,8 @@ class ParallelRunner:
 
     def jobs_file_write_status_change(self, id, status):
         with self.lock:
-            jobs_statuses = json.loads(
-                self.settings.jobs_status_path.read_text()
+            jobs_statuses = tools.load_json(
+                self.settings.jobs_status_path
             )
             jobs_statuses[id]["status"] = status
             self.settings.jobs_status_path.write_text(
@@ -509,7 +509,7 @@ class ParallelRunner:
     def read_keyvalues(self):
         """Read keyvalues file"""
 
-        keyvalues_unprocessed = json.loads(self.keyvalues_path.read_text())
+        keyvalues_unprocessed = tools.load_json(self.keyvalues_path.read_text())
         self.keyvalues_path.unlink()
 
         keyvalues = {}
