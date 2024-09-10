@@ -16,7 +16,7 @@ define _bumpversion
 	# upgrades as $(subst $(1),,$@) version, commits and tags
 	@docker run -it --rm -v $(PWD):/${DOCKER_IMAGE_NAME} \
 		-u $(shell id -u):$(shell id -g) \
-		itisfoundation/ci-service-integration-library:v1.0.2-dev-33 \
+		itisfoundation/ci-service-integration-library:latest \
 		sh -c "cd /${DOCKER_IMAGE_NAME} && bump2version --verbose --list --config-file $(1) $(subst $(2),,$@)"
 endef
 
