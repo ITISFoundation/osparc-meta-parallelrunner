@@ -52,10 +52,12 @@ def wait_for_path(file_path):
         observer.stop()
         observer.join()
 
-def load_json(file_path: pl.Path, wait=True, 
-              file_polling_interval=DEFAULT_FILE_POLLING_INTERVAL):
-    if wait:
-        wait_for_path(file_path)
+
+def load_json(
+    file_path, wait=True, file_polling_interval=DEFAULT_FILE_POLLING_INTERVAL
+):
+    # if wait:
+    #    wait_for_path(file_path)
 
     while True:
         try:

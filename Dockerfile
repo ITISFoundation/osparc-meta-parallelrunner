@@ -34,6 +34,7 @@ WORKDIR /docker/http/server
 RUN chown osparcuser:osparcuser jobs.json
 
 RUN npm install express
+RUN npm install cors
 RUN npm run build
 
 USER root

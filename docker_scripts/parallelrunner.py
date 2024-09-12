@@ -1,4 +1,5 @@
 import contextlib
+import datetime
 import getpass
 import json
 import logging
@@ -7,6 +8,7 @@ import os
 import pathlib as pl
 import tempfile
 import time
+import traceback
 import uuid
 import zipfile
 
@@ -304,7 +306,7 @@ class ParallelRunner:
                             at=output[probe_name]["filename"],
                         )
                         file_results = tools.load_json(
-                            file_results_path
+                            file_results_path, wait=False
                         )
 
                     output[probe_name]["value"] = file_results
@@ -372,9 +374,7 @@ class ParallelRunner:
 
     def jobs_file_write_new(self, id, name, description, status):
         with self.lock:
-            jobs_statuses = tools.load_json(
-                self.settings.jobs_status_path
-            )
+            jobs_statuses = tools.load_json(self.settings.jobs_status_path)
             jobs_statuses[id] = {
                 "name": name,
                 "description": description,
@@ -385,11 +385,23 @@ class ParallelRunner:
             )
 
     def jobs_file_write_status_change(self, id, status):
+        # Javascript current time
+        current_time = int(
+            datetime.datetime.now(tz=datetime.timezone.utc).timestamp() * 1000
+        )
+
+        # Protect concurrent read/write with a lock
         with self.lock:
-            jobs_statuses = tools.load_json(
-                self.settings.jobs_status_path
-            )
+            jobs_statuses = tools.load_json(self.settings.jobs_status_path)
             jobs_statuses[id]["status"] = status
+
+            if status == "running":
+                jobs_statuses[id]["startTime"] = current_time
+            elif status == "done":
+                jobs_statuses[id]["endTime"] = current_time
+            elif status == "failed":
+                jobs_statuses[id]["failTime"] = current_time
+
             self.settings.jobs_status_path.write_text(
                 json.dumps(jobs_statuses)
             )
@@ -457,7 +469,8 @@ class ParallelRunner:
             except Exception as error:
                 if trial_number >= self.settings.max_job_trials:
                     logger.info(
-                        f"Batch {batch} failed with error ({error}) in "
+                        f"Batch {batch} failed with error ("
+                        f"{traceback.format_exc()}) in "
                         f"trial {trial_number}, reach max number of trials of "
                         f"{self.settings.max_job_trials}, not retrying, raising error"
                     )
@@ -468,7 +481,8 @@ class ParallelRunner:
                     raise error
                 else:
                     logger.info(
-                        f"Batch {batch} failed with error ({error}) in "
+                        f"Batch {batch} failed with error ("
+                        f"{traceback.format_exc()}) in "
                         f"trial {trial_number}, retrying "
                     )
                     output_batch = map_func(
@@ -509,7 +523,9 @@ class ParallelRunner:
     def read_keyvalues(self):
         """Read keyvalues file"""
 
-        keyvalues_unprocessed = tools.load_json(self.keyvalues_path.read_text())
+        keyvalues_unprocessed = tools.load_json(
+            self.keyvalues_path.read_text()
+        )
         self.keyvalues_path.unlink()
 
         keyvalues = {}
