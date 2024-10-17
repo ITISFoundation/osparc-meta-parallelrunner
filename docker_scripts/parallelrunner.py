@@ -431,6 +431,7 @@ class ParallelRunner:
                 job_inputs = self.create_job_inputs(task_input)
 
                 with pathos.pools.ThreadPool(nodes=1) as timeout_pool:
+                    timeout_pool.restart()
                     output_batch_waiter = timeout_pool.apipe(
                         self.run_job, job_inputs, batch
                     )
