@@ -486,7 +486,7 @@ class ParallelRunner:
                         f"trial {trial_number}, retrying "
                     )
                     output_batch = map_func(
-                        batch, trial_number=trial_number + 1
+                        batch_with_uuid, trial_number=trial_number + 1
                     )
 
             return output_batch
