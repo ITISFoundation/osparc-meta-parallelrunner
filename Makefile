@@ -31,7 +31,7 @@ version-patch version-minor version-major: .bumpversion.cfg ## increases service
 compose-spec: ## runs ooil to assemble the docker-compose.yml file
 	@docker run --rm -v $(PWD):/${DOCKER_IMAGE_NAME} \
 		-u $(shell id -u):$(shell id -g) \
-		itisfoundation/ci-service-integration-library:v1.0.4 \
+		itisfoundation/ci-service-integration-library:latest \
 		sh -c "cd /${DOCKER_IMAGE_NAME} && ooil compose"
 
 clean:
