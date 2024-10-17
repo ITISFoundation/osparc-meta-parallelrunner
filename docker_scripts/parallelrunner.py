@@ -509,6 +509,7 @@ class ParallelRunner:
             )
 
         with pathos.pools.ThreadPool(nodes=number_of_workers) as pool:
+            pool.restart()
             output_tasks = list(pool.map(map_func, input_batches_with_uuid))
             pool.close()
             pool.join()
