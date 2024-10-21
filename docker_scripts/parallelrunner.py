@@ -209,9 +209,10 @@ class ParallelRunner:
                     processed_param_value = f"File json: {param_value}"
                 else:
                     logger.info("Calling upload file api for job input")
-                    input_data_file = osparc.FilesApi(
-                        self.api_client
-                    ).upload_file(file=tmp_input_file_path)
+                    with self.lock:
+                        input_data_file = osparc.FilesApi(
+                            self.api_client
+                        ).upload_file(file=tmp_input_file_path)
                     logger.info("File upload for job input done")
                     processed_param_value = input_data_file
             elif param_type == "file":
@@ -280,9 +281,10 @@ class ParallelRunner:
                     f"Job returned a failed status: {job_status.state}"
                 )
             else:
-                job_outputs = self.studies_api.get_study_job_outputs(
-                    study_id=self.settings.template_id, job_id=job.id
-                ).results
+                with self.lock:
+                    job_outputs = self.studies_api.get_study_job_outputs(
+                        study_id=self.settings.template_id, job_id=job.id
+                    ).results
 
             done_batch = self.process_job_outputs(
                 job_outputs, input_batch, job_status.state
@@ -305,11 +307,12 @@ class ParallelRunner:
                 probe_type = output[probe_name]["type"]
 
                 if probe_type == "FileJSON":
-                    output_file = pl.Path(
-                        osparc.FilesApi(self.api_client).download_file(
-                            probe_output.id
+                    with self.lock:
+                        output_file = pl.Path(
+                            osparc.FilesApi(self.api_client).download_file(
+                                probe_output.id
+                            )
                         )
-                    )
                     with zipfile.ZipFile(output_file, "r") as zip_file:
                         file_results_path = zipfile.Path(
                             zip_file,
@@ -321,12 +324,13 @@ class ParallelRunner:
 
                     output[probe_name]["value"] = file_results
                 elif probe_type == "file":
-                    tmp_output_data_file = osparc.FilesApi(
-                        self.api_client
-                    ).download_file(probe_output.id)
-                    output_data_file = osparc.FilesApi(
-                        self.api_client
-                    ).upload_file(tmp_output_data_file)
+                    with self.lock:
+                        tmp_output_data_file = osparc.FilesApi(
+                            self.api_client
+                        ).download_file(probe_output.id)
+                        output_data_file = osparc.FilesApi(
+                            self.api_client
+                        ).upload_file(tmp_output_data_file)
 
                     output[probe_name]["value"] = json.dumps(
                         output_data_file.to_dict()
@@ -587,7 +591,8 @@ class ParallelRunner:
         try:
             yield job
         finally:
-            studies_api.delete_study_job(template_id, job.id)
+            with self.lock:
+                studies_api.delete_study_job(template_id, job.id)
 
     class FatalException(Exception):
         pass
