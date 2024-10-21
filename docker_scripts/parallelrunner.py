@@ -252,6 +252,7 @@ class ParallelRunner:
         with self.create_study_job(
             self.settings.template_id, job_inputs, self.studies_api
         ) as job:
+            logger.info(f"Calling start study api for job {job.id}")
             job_status = self.studies_api.start_study_job(
                 study_id=self.settings.template_id, job_id=job.id
             )
@@ -543,6 +544,7 @@ class ParallelRunner:
         while True:
             try:
                 n_of_create_attempts += 1
+                logger.info(f"Calling create study api for template {template_id}")
                 job = studies_api.create_study_job(
                     study_id=template_id,
                     job_inputs=job_inputs,
