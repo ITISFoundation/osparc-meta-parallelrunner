@@ -207,9 +207,11 @@ class ParallelRunner:
                 if self.test_mode:
                     processed_param_value = f"File json: {param_value}"
                 else:
+                    logger.info("Calling upload file api for job input")
                     input_data_file = osparc.FilesApi(
                         self.api_client
                     ).upload_file(file=tmp_input_file_path)
+                    logger.info(f"File upload for job input done")
                     processed_param_value = input_data_file
             elif param_type == "file":
                 file_info = json.loads(param_value)
@@ -256,6 +258,7 @@ class ParallelRunner:
             job_status = self.studies_api.start_study_job(
                 study_id=self.settings.template_id, job_id=job.id
             )
+            logger.info(f"Start study api for job {job.id} done")
 
             while job_status.stopped_at is None:
                 job_status = self.studies_api.inspect_study_job(
@@ -549,6 +552,7 @@ class ParallelRunner:
                     study_id=template_id,
                     job_inputs=job_inputs,
                 )
+                logger.info(f"Create study api for template {template_id} done")
                 break
             except osparc_client.exceptions.ApiException as api_exception:
                 if (
