@@ -13,12 +13,6 @@ RUN apk add --no-cache python3 py3-pip wget bash su-exec
 # Copying boot scripts                                                                                                                                                                                                                                                                                                   
 COPY docker_scripts /docker
 
-USER osparcuser
-
-WORKDIR /home/osparcuser
-RUN python3 -m venv venv
-RUN . ./venv/bin/activate && pip3 install -r /docker/requirements.txt 
-
 USER root
 
 WORKDIR /docker/http
@@ -36,6 +30,13 @@ RUN chown osparcuser:osparcuser jobs.json
 RUN npm install express
 RUN npm install cors
 RUN npm run build
+
+USER osparcuser
+
+WORKDIR /home/osparcuser
+RUN python3 -m venv venv
+RUN . ./venv/bin/activate && pip3 install -r /docker/requirements.txt 
+
 
 USER root
 EXPOSE 8888

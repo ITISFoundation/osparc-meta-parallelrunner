@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import datetime
 import getpass
@@ -211,7 +212,7 @@ class ParallelRunner:
                     input_data_file = osparc.FilesApi(
                         self.api_client
                     ).upload_file(file=tmp_input_file_path)
-                    logger.info(f"File upload for job input done")
+                    logger.info("File upload for job input done")
                     processed_param_value = input_data_file
             elif param_type == "file":
                 file_info = json.loads(param_value)
@@ -237,17 +238,21 @@ class ParallelRunner:
 
         return job_inputs
 
-    def run_job(self, job_inputs, input_batch):
+    async def run_job(self, job_inputs, input_batch):
         """Run a job with given inputs"""
 
         logger.debug(f"Sending inputs: {job_inputs}")
         if self.test_mode:
+            import datetime
+
+            print(f"Start run job: {datetime.datetime.now()}")
             logger.info("Map in test mode, just returning input")
 
             done_batch = self.process_job_outputs(
                 job_inputs, input_batch, "SUCCESS"
             )
             time.sleep(1)
+            print(f"Stop run job: {datetime.datetime.now()}")
 
             return done_batch
 
@@ -255,9 +260,10 @@ class ParallelRunner:
             self.settings.template_id, job_inputs, self.studies_api
         ) as job:
             logger.info(f"Calling start study api for job {job.id}")
-            job_status = self.studies_api.start_study_job(
-                study_id=self.settings.template_id, job_id=job.id
-            )
+            with self.lock:
+                job_status = self.studies_api.start_study_job(
+                    study_id=self.settings.template_id, job_id=job.id
+                )
             logger.info(f"Start study api for job {job.id} done")
 
             while job_status.stopped_at is None:
@@ -419,6 +425,9 @@ class ParallelRunner:
         self.n_of_finished_batches = 0
 
         def map_func(batch_with_uuid, trial_number=1):
+            return asyncio.run(async_map_func(batch_with_uuid, trial_number))
+
+        async def async_map_func(batch_with_uuid, trial_number=1):
             batch_uuid, batch = batch_with_uuid
             try:
                 logger.info(
@@ -434,20 +443,15 @@ class ParallelRunner:
 
                 job_inputs = self.create_job_inputs(task_input)
 
-                with pathos.pools.ThreadPool(nodes=1) as timeout_pool:
-                    timeout_pool.restart()
-                    output_batch_waiter = timeout_pool.apipe(
-                        self.run_job, job_inputs, batch
-                    )
-                    job_timeout = (
-                        self.settings.job_timeout
-                        if self.settings.job_timeout > 0
-                        else None
-                    )
-                    output_batch = output_batch_waiter.get(timeout=job_timeout)
-                    timeout_pool.close()
-                    timeout_pool.join()
-                    timeout_pool.clear()  # Pool is singleton, need to clear old pool
+                job_timeout = (
+                    self.settings.job_timeout
+                    if self.settings.job_timeout > 0
+                    else None
+                )
+
+                output_batch = await asyncio.wait_for(
+                    self.run_job(job_inputs, batch), timeout=job_timeout
+                )
 
                 self.jobs_file_write_status_change(
                     id=batch_uuid,
@@ -547,12 +551,17 @@ class ParallelRunner:
         while True:
             try:
                 n_of_create_attempts += 1
-                logger.info(f"Calling create study api for template {template_id}")
-                job = studies_api.create_study_job(
-                    study_id=template_id,
-                    job_inputs=job_inputs,
+                logger.info(
+                    f"Calling create study api for template {template_id}"
                 )
-                logger.info(f"Create study api for template {template_id} done")
+                with self.lock:
+                    job = studies_api.create_study_job(
+                        study_id=template_id,
+                        job_inputs=job_inputs,
+                    )
+                logger.info(
+                    f"Create study api for template {template_id} done"
+                )
                 break
             except osparc_client.exceptions.ApiException as api_exception:
                 if (
