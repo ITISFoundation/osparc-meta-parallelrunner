@@ -5,7 +5,7 @@ SHELL = /bin/sh
 MAKEFLAGS += -j2
 
 export DOCKER_IMAGE_NAME ?= osparc-meta-parallelrunner
-export DOCKER_IMAGE_TAG ?= 1.1.7
+export DOCKER_IMAGE_TAG ?= 1.1.8
 
 export MASTER_AWS_REGISTRY ?= registry.osparc-master-zmt.click
 export MASTER_REGISTRY ?= registry.osparc-master.speag.com
