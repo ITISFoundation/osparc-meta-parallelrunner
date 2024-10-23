@@ -44,9 +44,6 @@ class ParallelRunner:
             self.output_tasks_dir_path / "output_tasks.json"
         )
 
-        if self.output_tasks_path.exists():
-            self.output_tasks_path.unlink()
-
         self.caller_uuid = None
         self.uuid = str(uuid.uuid4())
 
@@ -113,7 +110,6 @@ class ParallelRunner:
         waiter_wrong_uuid = 0
         while True:
             tools.wait_for_path(self.input_tasks_path)
-
             input_dict = tools.load_json(self.input_tasks_path)
             command = input_dict["command"]
             caller_uuid = input_dict["caller_uuid"]
@@ -139,6 +135,9 @@ class ParallelRunner:
                     time.sleep(self.settings.file_polling_interval)
                     waiter_wrong_uuid += 1
                 else:
+                    if self.output_tasks_path.exists():
+                        self.output_tasks_path.unlink()
+
                     input_tasks = input_dict["tasks"]
 
                     self.run_input_tasks(input_tasks, tasks_uuid)
