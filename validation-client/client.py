@@ -69,6 +69,5 @@ def main():
     }
     input_tasks_path.write_text(json.dumps(stop_command))
 
-
 if __name__ == "__main__":
     main()

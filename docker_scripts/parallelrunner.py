@@ -150,6 +150,8 @@ class ParallelRunner:
 
     def run_input_tasks(self, input_tasks, tasks_uuid):
         number_of_workers = self.settings.number_of_workers
+        self.jobs_settings_file_write(number_of_workers)
+
         batch_mode = self.settings.batch_mode
 
         if batch_mode:
@@ -376,8 +378,9 @@ class ParallelRunner:
                 else:
                     if param_name in task_input:
                         raise ParallelRunner.FatalException(
-                            "Can only handle multiple value of FileJSON in "
-                            "one batch, received several "
+                            "Can only handle multiple values of FileJSON in "
+                            "one batch, not other input types, received "
+                            "several values of type "
                             f"{param_type} for {param_name}"
                         )
                     else:
@@ -385,7 +388,21 @@ class ParallelRunner:
 
         return task_input
 
+    def jobs_settings_file_write(self, number_of_workers):
+        """Write json file with number of workers for GUI"""
+
+        with self.lock:
+            jobs_settings = tools.load_json(self.settings.jobs_settings_path)
+            jobs_settings = {
+                "number_of_workers": number_of_workers,
+            }
+            self.settings.jobs_settings_path.write_text(
+                json.dumps(jobs_settings)
+            )
+
     def jobs_file_write_new(self, id, name, description, status):
+        """Add new job to job status file for GUI"""
+
         with self.lock:
             jobs_statuses = tools.load_json(self.settings.jobs_status_path)
             jobs_statuses[id] = {
@@ -398,6 +415,8 @@ class ParallelRunner:
             )
 
     def jobs_file_write_status_change(self, id, status):
+        """Update job in job status file for GUI"""
+
         # Javascript current time
         current_time = int(
             datetime.datetime.now(tz=datetime.timezone.utc).timestamp() * 1000

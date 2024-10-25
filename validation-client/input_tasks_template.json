@@ -93,6 +93,81 @@
                     "type": "integer"
                 }
             }
+        },
+        {
+            "input": {
+                "InputFile1": {
+                     "type": "FileJSON",
+                     "filename": "input.json",
+                     "value": [
+                        0.7119122781302056,
+                        0.29588291546315737,
+                        0.4652890454124229
+                     ]
+                }
+            },
+            "output": {
+                "OutputFile1": {
+                     "type": "FileJSON",
+                     "filename": "output.json"
+                },
+                "OutputNumber1": {
+                    "type": "float"
+                },
+                "OutputInteger1": {
+                    "type": "integer"
+                }
+            }
+        },
+        {
+            "input": {
+                "InputFile1": {
+                     "type": "FileJSON",
+                     "filename": "input.json",
+                     "value": [
+                        0.1119122781302056,
+                        0.29588291546315737,
+                        0.4652890454124229
+                     ]
+                }
+            },
+            "output": {
+                "OutputFile1": {
+                     "type": "FileJSON",
+                     "filename": "output.json"
+                },
+                "OutputNumber1": {
+                    "type": "float"
+                },
+                "OutputInteger1": {
+                    "type": "integer"
+                }
+            }
+        },
+        {
+            "input": {
+                "InputFile1": {
+                     "type": "FileJSON",
+                     "filename": "input.json",
+                     "value": [
+                        0.2119122781302056,
+                        0.29588291546315737,
+                        0.4652890454124229
+                     ]
+                }
+            },
+            "output": {
+                "OutputFile1": {
+                     "type": "FileJSON",
+                     "filename": "output.json"
+                },
+                "OutputNumber1": {
+                    "type": "float"
+                },
+                "OutputInteger1": {
+                    "type": "integer"
+                }
+            }
         }
     ]
 }
