@@ -25,7 +25,8 @@ RUN npm install -D tailwindcss@latest postcss@latest autoprefixer@latest
 RUN npx tailwindcss init -p
 
 WORKDIR /docker/http/server
-RUN chown osparcuser:osparcuser jobs.json
+RUN chown osparcuser:osparcuser jobs_settings.json
+RUN chown osparcuser:osparcuser jobs_status.json
 
 RUN npm install express
 RUN npm install cors
@@ -40,6 +41,7 @@ RUN . ./venv/bin/activate && pip3 install -r /docker/requirements.txt
 
 USER root
 EXPOSE 8888
-ENV JOBS_STATUS_PATH=/docker/http/server/jobs.json
+ENV JOBS_SETTINGS_PATH=/docker/http/server/jobs_settings.json
+ENV JOBS_STATUS_PATH=/docker/http/server/jobs_status.json
 
 ENTRYPOINT [ "/bin/bash", "-c", "/docker/entrypoint.bash" ]

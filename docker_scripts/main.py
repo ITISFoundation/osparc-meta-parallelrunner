@@ -63,6 +63,7 @@ class ParallelRunnerDynamicSettings:
         # Hide some settings from the user
         for field_name in [
             "max_number_of_workers",
+            "JOBS_SETTINGS_PATH",
             "JOBS_STATUS_PATH",
             "DY_SIDECAR_PATH_INPUTS",
             "DY_SIDECAR_PATH_OUTPUTS",
@@ -115,6 +116,9 @@ class ParallelRunnerDynamicSettings:
             default=DEFAULT_JOB_CREATE_ATTEMPTS_DELAY, gt=0
         )
         job_timeout: float = pyda.Field(default=DEFAULT_JOB_TIMEOUT, ge=0)
+        jobs_settings_path: pyda.FilePath = pyda.Field(
+            alias="JOBS_SETTINGS_PATH"
+        )
         jobs_status_path: pyda.FilePath = pyda.Field(alias="JOBS_STATUS_PATH")
 
 

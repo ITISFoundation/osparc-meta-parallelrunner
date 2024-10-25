@@ -9,7 +9,8 @@ const port = 8888;
 app.use(cors());
 app.use(express.json());
 
-const dataFile = path.join(__dirname, 'jobs.json');
+const jobsstatusFile = path.join(__dirname, 'jobs_status.json');
+const jobssettingsFile = path.join(__dirname, 'jobs_settings.json');
 
 const calculateCompletionTime = (job) => {
   return job.endTime && job.startTime 
@@ -42,9 +43,11 @@ const calculateRunningTimeAndETA = (job, finishedJobs) => {
 
 app.get('/api/jobs', async (req, res) => {
   try {
-    const data = await fs.readFile(dataFile, 'utf8');
+    const data = await fs.readFile(jobsstatusFile, 'utf8');
     const jobs = JSON.parse(data);
-    
+
+    const numberOfWorkers = JSON.parse(await fs.readFile(jobssettingsFile, 'utf8')).number_of_workers;
+
     // First, calculate completion times for finished jobs
     const finishedJobs = Object.values(jobs)
       .filter(job => job.status === 'done')
@@ -57,14 +60,14 @@ app.get('/api/jobs', async (req, res) => {
     const updatedJobs = Object.entries(jobs).reduce((acc, [id, job]) => {
       const updatedJob = calculateRunningTimeAndETA(job, finishedJobs);
       acc[id] = updatedJob;
-      
+
       if (updatedJob.status === 'running' && updatedJob.eta !== null) {
-        totalRemainingTime += updatedJob.eta;
+        totalRemainingTime += updatedJob.eta / numberOfWorkers;
         runningJobsCount++;
       } else if (updatedJob.status === 'todo') {
         todoJobsCount++;
       }
-      
+
       return acc;
     }, {});
 
@@ -75,7 +78,7 @@ app.get('/api/jobs', async (req, res) => {
 
     // Add estimated time for todo jobs
     if (averageCompletionTime !== null) {
-      totalRemainingTime += todoJobsCount * averageCompletionTime;
+      totalRemainingTime += todoJobsCount * averageCompletionTime / numberOfWorkers;
     }
 
     const overallETA = (runningJobsCount > 0 || todoJobsCount > 0) ? Math.floor(totalRemainingTime) : null;
@@ -95,7 +98,7 @@ app.put('/api/jobs/:id', async (req, res) => {
   const { status } = req.body;
 
   try {
-    const data = await fs.readFile(dataFile, 'utf8');
+    const data = await fs.readFile(jobsstatusFile, 'utf8');
     const jobs = JSON.parse(data);
 
     if (!jobs[id]) {
@@ -118,7 +121,7 @@ app.put('/api/jobs/:id', async (req, res) => {
 
     const updatedJob = calculateRunningTimeAndETA(jobs[id], finishedJobs);
 
-    await fs.writeFile(dataFile, JSON.stringify(jobs, null, 2));
+    await fs.writeFile(jobsstatusFile, JSON.stringify(jobs, null, 2));
     res.json(updatedJob);
   } catch (err) {
     console.error('Error updating job:', err);
