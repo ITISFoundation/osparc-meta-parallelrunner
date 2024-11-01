@@ -7,7 +7,7 @@ on:
 
 jobs:
   call-test-workflow:
-    uses: wvangeit/osparc-meta-parallelrunner/.github/workflows/test.yml@master
+    uses: ITISFoundation/osparc-meta-parallelrunner/.github/workflows/test.yml@master
     newversion:
       name: make new version
       runs-on: ubuntu-latest
