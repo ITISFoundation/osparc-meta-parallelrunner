@@ -8,9 +8,6 @@ services:
       - DY_SIDECAR_PATH_OUTPUTS=/tmp/outputs
       - DY_BOOT_OPTION_BOOT_MODE=0
       - DY_SIDECAR_PATH=/home/osparcuser/work/workspace
-      - OSPARC_API_HOST=10.43.103.149.nip.io:8006
-      - OSPARC_API_KEY=test_T1QyAxKBUX
-      - OSPARC_API_SECRET=0dsHA6zdYDNEtwNKsXZHBQq8eHuPbd
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ${PWD}/validation-tmp/workspace:/home/osparcuser/work/workspace

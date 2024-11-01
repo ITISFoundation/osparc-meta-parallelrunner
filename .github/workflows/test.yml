@@ -2,11 +2,8 @@ name: Test
 
 on:
     pull_request:
-    push:
-      branches:
-        - master
     workflow_call:
-        
+
 jobs:
     test:
         name: Test for python ${{ matrix.python-version }} on ${{ matrix.os }}
@@ -31,4 +28,3 @@ jobs:
               run: make build
             - name: Make run-local
               run: make run-local
-          
