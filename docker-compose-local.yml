@@ -8,6 +8,9 @@ services:
       - DY_SIDECAR_PATH_OUTPUTS=/tmp/outputs
       - DY_BOOT_OPTION_BOOT_MODE=0
       - DY_SIDECAR_PATH=/home/osparcuser/work/workspace
+      - OSPARC_API_HOST=
+      - OSPARC_API_KEY=
+      - OSPARC_API_SECRET=
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ${PWD}/validation-tmp/workspace:/home/osparcuser/work/workspace
