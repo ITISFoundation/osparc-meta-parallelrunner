@@ -155,7 +155,7 @@ class ParallelRunner:
         batch_mode = self.settings.batch_mode
 
         if batch_mode:
-            n_of_batches = number_of_workers
+            n_of_batches = min(number_of_workers, len(input_tasks))
         else:
             n_of_batches = len(input_tasks)
 
