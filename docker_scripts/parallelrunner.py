@@ -7,7 +7,6 @@ import logging
 import multiprocessing
 import os
 import pathlib as pl
-import pprint
 import tempfile
 import time
 import traceback
@@ -511,7 +510,7 @@ class ParallelRunner:
                 )
                 set_batch_status(batch, "FAILURE")
                 # raise error
-            except Exception as error:
+            except Exception:
                 if trial_number >= self.settings.max_job_trials:
                     logger.info(
                         f"Batch {batch} failed with error ("
