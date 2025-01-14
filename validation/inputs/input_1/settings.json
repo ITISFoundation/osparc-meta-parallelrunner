@@ -1,5 +1,5 @@
 {
-    "template_id": "TEST_UUID",
+    "template_id": "c9cc1272-d258-11ef-b478-0242ac177dff",
     "number_of_workers": 2,
     "batch_mode": false,
     "job_timeout": 60

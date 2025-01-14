@@ -216,10 +216,9 @@ class ParallelRunner:
                         processed_param_value = f"File json: {param_value}"
                     else:
                         logger.info("Calling upload file api for job input")
-                        with self.lock:
-                            input_data_file = osparc.FilesApi(
-                                self.api_client
-                            ).upload_file(file=tmp_input_file_path)
+                        input_data_file = osparc.FilesApi(
+                            self.api_client
+                        ).upload_file(file=tmp_input_file_path)
                         logger.info("File upload for job input done")
                         processed_param_value = input_data_file
             elif param_type == "file":
