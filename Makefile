@@ -40,6 +40,7 @@ clean:
 .PHONY: build
 build: clean compose-spec	## build docker image
 	@chmod -R 755 docker_scripts
+	@sed -i 's/\$$\$${\([^}]*\)}/\$$\$$\$$\$${\1}/g' docker-compose.yml
 	@docker compose build
 
 validation-clean:
