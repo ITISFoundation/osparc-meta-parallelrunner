@@ -21,8 +21,7 @@ RUN npm create vite@latest dashboard -- --template react
 
 WORKDIR /docker/http/dashboard
 RUN npm install
-RUN npm install -D tailwindcss@latest postcss@latest autoprefixer@latest
-RUN npx tailwindcss init -p
+RUN npm install -D tailwindcss@3 postcss@latest autoprefixer@latest
 
 WORKDIR /docker/http/server
 RUN chown osparcuser:osparcuser jobs_settings.json
